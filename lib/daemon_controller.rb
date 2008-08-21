@@ -32,8 +32,79 @@ class DaemonController
 	class ConnectError < Error
 	end
 
-	# pid_file *must* be readable and writable
-	# log_file *must* be readable
+	# Create a new DaemonController object.
+	#
+	# === Mandatory options
+	#
+	# [:identifier]
+	#  A human-readable, unique name for this daemon, e.g. "Sphinx search server".
+	#  This identifier will be used in some error messages. On some platforms, it will
+	#  be used for concurrency control: on such platforms, no two DaemonController
+	#  objects will operate on the same identifier on the same time.
+	#  
+	# [:start_command]
+	#  The command to start the daemon. This must be a a String, e.g.
+	#  "mongrel_rails start -e production".
+	#  
+	# [:ping_command]
+	#  The ping command is used to check whether the daemon can be connected to.
+	#  It is also used to ensure that #start only returns when the daemon can be
+	#  connected to.
+	#  
+	#  The value may be a command string. This command must exit with an exit code of
+	#  0 if the daemon can be successfully connected to, or exit with a non-0 exit
+	#  code on failure.
+	#  
+	#  The value may also be a Proc, which returns an expression that evaluates to
+	#  true (indicating that the daemon can be connected to) or false (failure).
+	#  
+	# [:pid_file]
+	#  The PID file that the daemon will write to. Used to check whether the daemon
+	#  is running.
+	#  
+	# [:log_file]
+	#  The log file that the daemon will write to. It will be consulted to see
+	#  whether the daemon has printed any error messages during startup.
+	#
+	# === Optional options
+	# [:stop_command]
+	#  A command to stop the daemon with, e.g. "/etc/rc.d/nginx stop". If no stop
+	#  command is given (i.e. +nil+), then DaemonController will stop the daemon
+	#  by killing the PID written in the PID file.
+	#  
+	#  The default value is +nil+.
+	#  
+	# [:start_timeout]
+	#  The maximum amount of time, in seconds, that #start may take to start
+	#  the daemon. Since #start also waits until the daemon can be connected to,
+	#  that wait time is counted as well. If the daemon does not start in time,
+	#  then #start will raise an exception.
+	#  
+	#  The default value is 15.
+	#  
+	# [:stop_timeout]
+	#  The maximum amount of time, in seconds, that #stop may take to stop
+	#  the daemon. Since #stop also waits until the daemon is no longer running,
+	#  that wait time is counted as well. If the daemon does not stop in time,
+	#  then #stop will raise an exception.
+	#  
+	#  The default value is 15.
+	#  
+	# [:log_file_activity_timeout]
+	#  Once a daemon has gone into the background, it will become difficult to
+	#  know for certain whether it is still initializing or whether it has
+	#  failed and exited, until it has written its PID file. It's 99.9% probable
+	#  that the daemon has terminated with an if its start timeout has expired,
+	#  not many system administrators want to wait 15 seconds (the default start
+	#  timeout) to be notified of whether the daemon has terminated with an error.
+	#  
+	#  An alternative way to check whether the daemon has terminated with an error,
+	#  is by checking whether its log file has been recently updated. If, after the
+	#  daemon has started, the log file hasn't been updated for the amount of seconds
+	#  given by the :log_file_activity_timeout option, then the daemon is assumed to
+	#  have terminated with an error.
+	#  
+	#  The default value is 7.
 	def initialize(options)
 		[:identifier, :start_command, :ping_command, :pid_file, :log_file].each do |option|
 			if !options.has_key?(option)
