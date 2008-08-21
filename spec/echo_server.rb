@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+# A simple echo server, used by the unit test.
 require 'socket'
 require 'optparse'
 
