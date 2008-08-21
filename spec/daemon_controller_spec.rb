@@ -68,6 +68,10 @@ module TestHelpers
 			f.write(contents)
 		end
 	end
+	
+	def exec_is_slow?
+		return RUBY_PLATFORM == "java"
+	end
 end
 
 describe DaemonController, "#start" do
@@ -146,14 +150,22 @@ describe DaemonController, "#start" do
 	end
 	
 	it "raises StartTimeout if the daemon doesn't start in time" do
-		new_controller(:start_command => 'sleep 2', :start_timeout => 0.15)
+		if exec_is_slow?
+			start_timeout = 4
+			min_start_timeout = 0
+			max_start_timeout = 6
+		else
+			start_timeout = 0.15
+			max_start_timeout = 0.30
+		end
+		new_controller(:start_command => 'sleep 2', :start_timeout => start_timeout)
 		start_time = Time.now
 		end_time = nil
 		@controller.should_receive(:start_timed_out).and_return do
 			end_time = Time.now
 		end
 		lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
-		(0.15 .. 0.30).should === end_time - start_time
+		(min_start_timeout .. max_start_timeout).should === end_time - start_time
 	end
 	
 	it "kills the daemon with a signal if the daemon doesn't start in time and there's a PID file" do
@@ -177,21 +189,21 @@ describe DaemonController, "#start" do
 		end
 	end
 	
-	it "raises StartError if the daemon exits with an error before forking" do
+	it "raises an error if the daemon exits with an error before forking" do
 		new_controller(:start_command => 'false')
-		lambda { @controller.start }.should raise_error(DaemonController::StartError)
+		lambda { @controller.start }.should raise_error(DaemonController::Error)
 	end
 	
-	it "raises StartTimeout if the daemon exits with an error after forking" do
+	it "raises an error if the daemon exits with an error after forking" do
 		new_controller(:crash_before_bind => true, :log_file_activity_timeout => 0.2)
-		lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
+		lambda { @controller.start }.should raise_error(DaemonController::Error)
 	end
 	
 	specify "the daemon's error output before forking is made available in the exception" do
-		new_controller(:start_command => 'echo hello world; false')
+		new_controller(:start_command => '(echo hello world; false)')
 		begin
 			@controller.start
-		rescue DaemonController::StartError => e
+		rescue DaemonController::Error => e
 			e.message.should == "hello world"
 		end
 	end
@@ -240,7 +252,7 @@ describe DaemonController, "#stop" do
 	
 	describe "if stop command was given" do
 		it "raises StopError if the stop command exits with an error" do
-			new_controller(:stop_command => 'echo hello world; false')
+			new_controller(:stop_command => '(echo hello world; false)')
 			begin
 				begin
 					@controller.stop
