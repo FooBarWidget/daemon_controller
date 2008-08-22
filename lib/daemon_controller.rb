@@ -16,6 +16,9 @@ require 'fcntl'
 require File.expand_path(File.dirname(__FILE__) << '/daemon_controller/lock_file')
 
 class DaemonController
+	ALLOWED_CONNECT_EXCEPTIONS = [Errno::ECONNREFUSED, Errno::ENETUNREACH,
+		Errno::ETIMEDOUT, Errno::ECONNRESET]
+	
 	class Error < StandardError
 	end
 	class TimeoutError < Error
@@ -148,8 +151,8 @@ class DaemonController
 	# started.
 	#
 	# The block must return nil or raise Errno::ECONNREFUSED, Errno::ENETUNREACH,
-	# or Errno::ETIMEDOUT to indicate that the daemon cannot be connected to.
-	# It must return non-nil if the daemon can be connected to.
+	# Errno::ETIMEDOUT, Errno::ECONNRESET to indicate that the daemon cannot be
+	# connected to. It must return non-nil if the daemon can be connected to.
 	# Upon successful connection, the return value of the block will
 	# be returned by #connect.
 	#
@@ -167,7 +170,7 @@ class DaemonController
 		@lock_file.shared_lock do
 			begin
 				connection = yield
-			rescue Errno::ECONNREFUSED, Errno::ENETUNREACH, Errno::ETIMEDOUT
+			rescue *ALLOWED_CONNECT_EXCEPTIONS
 				connection = nil
 			end
 		end
@@ -178,7 +181,7 @@ class DaemonController
 				end
 				begin
 					connection = yield
-				rescue Errno::ECONNREFUSED, Errno::ENETUNREACH, Errno::ETIMEDOUT
+				rescue *ALLOWED_CONNECT_EXCEPTIONS
 					connection = nil
 				end
 				if connection.nil?
