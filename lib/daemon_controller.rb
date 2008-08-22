@@ -211,7 +211,9 @@ class DaemonController
 		end
 	end
 	
-	# Returns the daemon's PID, as reported by its PID file.
+	# Returns the daemon's PID, as reported by its PID file. Returns the PID
+	# as an integer, or nil there is no valid PID in the PID file.
+	#
 	# This method doesn't check whether the daemon's actually running.
 	# Use #running? if you want to check whether it's actually running.
 	#
@@ -330,7 +332,10 @@ private
 	end
 	
 	def kill_daemon_with_signal
-		Process.kill('SIGTERM', read_pid_file)
+		pid = read_pid_file
+		if pid
+			Process.kill('SIGTERM', pid)
+		end
 	rescue Errno::ESRCH, Errno::ENOENT
 	end
 	
@@ -354,7 +359,12 @@ private
 	end
 	
 	def read_pid_file
-		return File.read(@pid_file).strip.to_i
+		pid = File.read(@pid_file).strip
+		if pid =~ /\A\d+\Z/
+			return pid.to_i
+		else
+			return nil
+		end
 	end
 	
 	def delete_pid_file
