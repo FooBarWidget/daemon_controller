@@ -74,6 +74,10 @@ class DaemonController
 	#  by killing the PID written in the PID file.
 	#  
 	#  The default value is +nil+.
+	#
+	# [:before_start]
+	# This may be a Proc. It will be called just before running the start command.
+	# The before_start proc is not subject to the start timeout.
 	#  
 	# [:start_timeout]
 	#  The maximum amount of time, in seconds, that #start may take to start
@@ -119,6 +123,7 @@ class DaemonController
 		@ping_interval = options[:ping_interval] || 0.1
 		@pid_file = options[:pid_file]
 		@log_file = options[:log_file]
+		@before_start = options[:before_start]
 		@start_timeout = options[:start_timeout] || 15
 		@stop_timeout = options[:stop_timeout] || 15
 		@log_file_activity_timeout = options[:log_file_activity_timeout] || 7
@@ -247,6 +252,7 @@ private
 		delete_pid_file
 		begin
 			started = false
+			before_start
 			Timeout.timeout(@start_timeout) do
 				done = false
 				spawn_daemon
@@ -288,11 +294,19 @@ private
 			result = :timeout
 		end
 		if !result
-			raise StartError, differences_in_log_file
+			raise(StartError, differences_in_log_file ||
+				"Daemon '#{@identifier}' failed to start.")
 		elsif result == :timeout
-			raise StartTimeout, differences_in_log_file
+			raise(StartTimeout, differences_in_log_file ||
+				"Daemon '#{@identifier}' failed to start in time.")
 		else
 			return true
+		end
+	end
+	
+	def before_start
+		if @before_start
+			@before_start.call
 		end
 	end
 	
@@ -428,7 +442,12 @@ private
 		if @original_log_file_stat
 			File.open(@log_file, 'r') do |f|
 				f.seek(@original_log_file_stat.size, IO::SEEK_SET)
-				return f.read.strip
+				diff = f.read.strip
+				if diff.empty?
+					return nil
+				else
+					return diff
+				end
 			end
 		else
 			return nil
