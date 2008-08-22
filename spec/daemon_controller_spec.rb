@@ -156,6 +156,7 @@ describe DaemonController, "#start" do
 			max_start_timeout = 6
 		else
 			start_timeout = 0.15
+			min_start_timeout = 0.15
 			max_start_timeout = 0.30
 		end
 		new_controller(:start_command => 'sleep 2', :start_timeout => start_timeout)
