@@ -13,6 +13,7 @@
 
 require 'tempfile'
 require 'fcntl'
+require File.expand_path(File.dirname(__FILE__) << '/daemon_controller/lock_file')
 
 class DaemonController
 	class Error < StandardError
@@ -132,7 +133,7 @@ class DaemonController
 	# - StartTimeout - the daemon did not start in time. This could also
 	#   mean that the daemon failed after it has gone into the background.
 	def start
-		exclusive_lock do
+		@lock_file.exclusive_lock do
 			start_without_locking
 		end
 	end
@@ -158,7 +159,7 @@ class DaemonController
 	#   to the daemon even after starting it.
 	def connect
 		connection = nil
-		shared_lock do
+		@lock_file.shared_lock do
 			begin
 				connection = yield
 			rescue Errno::ECONNREFUSED, Errno::ENETUNREACH, Errno::ETIMEDOUT
@@ -166,7 +167,7 @@ class DaemonController
 			end
 		end
 		if connection.nil?
-			exclusive_lock do
+			@lock_file.exclusive_lock do
 				if !daemon_is_running?
 					start_without_locking
 				end
@@ -197,7 +198,7 @@ class DaemonController
 	# - StopError - the stop command failed.
 	# - StopTimeout - the daemon didn't stop in time.
 	def stop
-		exclusive_lock do
+		@lock_file.exclusive_lock do
 			begin
 				Timeout.timeout(@stop_timeout) do
 					kill_daemon
@@ -220,7 +221,7 @@ class DaemonController
 	# Raises SystemCallError or IOError if something went wrong during
 	# reading of the PID file.
 	def pid
-		shared_lock do
+		@lock_file.shared_lock do
 			return read_pid_file
 		end
 	end
@@ -232,32 +233,12 @@ class DaemonController
 	# Raises SystemCallError or IOError if something went wrong during
 	# reading of the PID file.
 	def running?
-		shared_lock do
+		@lock_file.shared_lock do
 			return daemon_is_running?
 		end
 	end
 
 private
-	def exclusive_lock
-		File.open(@lock_file, 'w') do |f|
-			if Fcntl.const_defined? :F_SETFD
-				f.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC)
-			end
-			f.flock(File::LOCK_EX)
-			yield
-		end
-	end
-	
-	def shared_lock
-		File.open(@lock_file, 'w') do |f|
-			if Fcntl.const_defined? :F_SETFD
-				f.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC)
-			end
-			f.flock(File::LOCK_SH)
-			yield
-		end
-	end
-	
 	def start_without_locking
 		if daemon_is_running?
 			raise AlreadyStarted, "Daemon '#{@identifier}' is already started"
@@ -457,7 +438,7 @@ private
 	end
 	
 	def determine_lock_file(identifier, pid_file)
-		return File.expand_path(pid_file + ".lock")
+		return LockFile.new(File.expand_path(pid_file + ".lock"))
 	end
 	
 	def self.fork_supported?
