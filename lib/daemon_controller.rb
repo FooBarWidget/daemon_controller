@@ -61,6 +61,15 @@ class DaemonController
 	#  
 	#  The value may also be a Proc, which returns an expression that evaluates to
 	#  true (indicating that the daemon can be connected to) or false (failure).
+	#  If the Proc raises Errno::ECONNREFUSED, Errno::ENETUNREACH, Errno::ETIMEDOUT
+	#  or Errno::ECONNRESET, then that also means that the daemon cannot be connected
+	#  to.
+	#  <b>NOTE:</b> if the ping command returns an object which responds to
+	#  <tt>#close</tt>, then that method will be called on the return value.
+	#  This makes it possible to specify a ping command such as
+	#  <tt>lambda { TCPSocket.new('localhost', 1234) }</tt>, without having to worry
+	#  about closing it afterwards.
+	#  Any exceptions raised by #close are ignored.
 	#  
 	# [:pid_file]
 	#  The PID file that the daemon will write to. Used to check whether the daemon
@@ -511,7 +520,15 @@ private
 	
 	def run_ping_command
 		if @ping_command.respond_to?(:call)
-			return @ping_command.call
+			begin
+				value = @ping_command.call
+				if value.respond_to?(:close)
+					value.close rescue nil
+				end
+				return value
+			rescue *ALLOWED_CONNECT_EXCEPTIONS
+				return false
+			end
 		else
 			return system(@ping_command)
 		end
