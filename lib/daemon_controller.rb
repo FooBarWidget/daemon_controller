@@ -1,20 +1,29 @@
-# Basic functionality for a single, local, external daemon:
-# - starting daemon
-#   * must be concurrency-safe!
-#   * must be able to report startup errors!
-#   * returns when daemon is fully operational
-# - stopping daemon
-#   * must be concurrency-safe!
-#   * returns when daemon has exited
-# - querying the status of a daemon
-#   * querying the status of a daemon (i.e. whether it's running)
-# - connect to a daemon, and start it if it isn't already running
-#   * must be a single atomic action
+# daemon_controller, library for robust daemon management
+# Copyright (c) 2008 Phusion
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 require 'tempfile'
 require 'fcntl'
 require File.expand_path(File.dirname(__FILE__) << '/daemon_controller/lock_file')
 
+# Main daemon controller object. See the README for an introduction and tutorial.
 class DaemonController
 	ALLOWED_CONNECT_EXCEPTIONS = [Errno::ECONNREFUSED, Errno::ENETUNREACH,
 		Errno::ETIMEDOUT, Errno::ECONNRESET]
@@ -88,8 +97,8 @@ class DaemonController
 	#  The default value is +nil+.
 	#
 	# [:before_start]
-	# This may be a Proc. It will be called just before running the start command.
-	# The before_start proc is not subject to the start timeout.
+	#  This may be a Proc. It will be called just before running the start command.
+	#  The before_start proc is not subject to the start timeout.
 	#  
 	# [:start_timeout]
 	#  The maximum amount of time, in seconds, that #start may take to start

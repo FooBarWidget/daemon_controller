@@ -5,12 +5,12 @@ Gem::Specification.new do |s|
   s.summary = "A library for implementing daemon management capabilities"
   s.email = "hongli@phusion.nl"
   s.homepage = "http://github.com/FooBarWidget/daemon_controller/tree/master"
-  s.description = "A library for implementing daemon management capabilities."
-  s.has_rdoc = false
+  s.description = "A library for robust daemon management."
+  s.has_rdoc = true
   s.authors = ["Hongli Lai"]
   
   s.files = [
-      "README.rdoc", "LICENSE.txt", "daemon_controller.gemspec",
+      "README.markdown", "LICENSE.txt", "daemon_controller.gemspec",
       "lib/daemon_controller.rb",
       "lib/daemon_controller/lock_file.rb",
       "spec/daemon_controller_spec.rb",
