@@ -216,8 +216,9 @@ daemon_controller is not a replacement for [Monit](http://www.tildeslash.com/mon
 or [God](http://god.rubyforge.org/). Rather, it is a solution to the following
 problem:
 
-> Hongli: hey Ninh, do a 'git pull', I just implemented awesome searching
+> *Hongli:* hey Ninh, do a 'git pull', I just implemented awesome searching
 >         features in our application!
+>
 >   Ninh: cool. *pulls from repository*
 >   Ninh: hey Hongli, it doesn't work.
 > Hongli: what do you mean, it doesn't work?
