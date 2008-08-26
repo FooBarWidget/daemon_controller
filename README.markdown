@@ -24,7 +24,7 @@ some of them.
 ### Starting daemons is a hassle
 
 If you've used similar software, then you might agree that managing these
-daemons are a hassle. If you're using BackgrounDRb, then the daemon must be
+daemons is a hassle. If you're using BackgrounDRb, then the daemon must be
 running. Starting the daemon is not hard, but it is annoying. It's also
 possible that the system administrator forgets to start the daemon. While
 configuring the system to automatically start a daemon at startup is not hard,
@@ -209,6 +209,44 @@ daemon_controller's goal is to make daemon management less of a hassle, and as
 automatic and straightforward as possible.
 
 
+What about Monit/God?
+=====================
+
+daemon_controller is not a replacement for [Monit](http://www.tildeslash.com/monit/)
+or [God](http://god.rubyforge.org/). Rather, it is a solution to the following
+problem:
+
+> Hongli: hey Ninh, do a 'git pull', I just implemented awesome searching
+>         features in our application!
+>   Ninh: cool. *pulls from repository*
+>   Ninh: hey Hongli, it doesn't work.
+> Hongli: what do you mean, it doesn't work?
+>   Ninh: it says "connection refused", or something
+> Hongli: oh I forgot to mention it, you have to run the Sphinx search daemon
+>         before it works. type "rake sphinx:daemon:start" to do that
+>   Ninh: great. but now I get a different error. something about BackgrounDRb.
+> Hongli: oops, I forgot to mention this too. you need to start the BackgrounDRb
+>         server with "rake backgroundrb:start_server"
+>   Ninh: okay, so every time I want to use this app, I have to type
+>         "rake sphinx:daemon:start", "rake backgroundrb:start_server" and
+>         "./script/server"?
+> Hongli: yep
+
+Imagine the above conversation becoming just:
+
+> Hongli: hey Ninh, do a 'git pull', I just implemented awesome searching
+>         features in our application!
+>   Ninh: cool. *pulls from repository*
+>   Ninh: awesome, it works!
+
+This is not something that can be achieved with Monit/God. Monit/God are for
+monitoring daemons, auto-restarting them when they use too much resources.
+daemon_controller's goal is to allow developers to implement daemon
+starting/stopping and daemon auto-starting code that's robust. daemon_controller
+is intended to be used to make daemon-dependent applications Just Work(tm)
+without having to start the daemons manually.
+
+
 Tutorial #1: controlling Apache
 ===============================
 
@@ -271,7 +309,7 @@ raises `Errno::ECONNREFUSED`, then that's also interpreted by DaemonController
 as meaning that the daemon isn't responding yet.
 
 After `controller.start` has returned, we can continue with the test case. At
-this point, we know that Apache has done initializing.
+this point, we know that Apache is done with initializing.
 When we're done with Apache, we stop it with `controller.stop`. This does not
 return until Apache has fully stopped.
 
@@ -295,7 +333,7 @@ that there's little room for human screw-up, and so we've developed this
 library. Our Sphinx search daemon is completely managed through this library
 and is automatically started on demand.
 
-Our Sphinx config file is generated from an ERB template. This ERB templates
+Our Sphinx config file is generated from an ERB template. This ERB template
 writes different values in the config file, depending on whether we're in
 development, test or production mode. We will want to regenerate this config
 file every time, just before we start the search daemon.
