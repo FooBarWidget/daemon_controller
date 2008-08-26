@@ -365,7 +365,7 @@ This can be achieved with the following code:
              :before_start => method(:before_start),
              :ping_command => lambda { TCPSocket.new('localhost', SEARCH_SERVER_PORT) },
              :pid_file => 'tmp/pids/sphinx.pid',
-             :log_file => 'log/sphinx.log',
+             :log_file => 'log/sphinx.log')
        end
        
        def query(search_terms)
