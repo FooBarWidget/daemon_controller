@@ -218,18 +218,18 @@ problem:
 
 > **Hongli:** hey Ninh, do a 'git pull', I just implemented awesome searching
 >             features in our application!  
-> **  Ninh:** cool. *pulls from repository*  
-> **  Ninh:** hey Hongli, it doesn't work.  
+>   **Ninh:** cool. *pulls from repository*  
+>   **Ninh:** hey Hongli, it doesn't work.  
 > **Hongli:** what do you mean, it doesn't work?  
-> **  Ninh:** it says "connection refused", or something  
+>   **Ninh:** it says "connection refused", or something  
 > **Hongli:** oh I forgot to mention it, you have to run the Sphinx search
 >             daemon before it works. type "rake sphinx:daemon:start" to do
 >             that  
-> **  Ninh:** great. but now I get a different error. something about
+>   **Ninh:** great. but now I get a different error. something about
 >             BackgrounDRb.  
 > **Hongli:** oops, I forgot to mention this too. you need to start the
 >             BackgrounDRb server with "rake backgroundrb:start_server"  
-> **  Ninh:** okay, so every time I want to use this app, I have to type
+>   **Ninh:** okay, so every time I want to use this app, I have to type
 >             "rake sphinx:daemon:start", "rake backgroundrb:start_server" and
 >             "./script/server"?  
 > **Hongli:** yep
@@ -238,8 +238,8 @@ Imagine the above conversation becoming just:
 
 > **Hongli:** hey Ninh, do a 'git pull', I just implemented awesome searching
 >             features in our application!  
-> **  Ninh:** cool. *pulls from repository*  
-> **  Ninh:** awesome, it works!
+>   **Ninh:** cool. *pulls from repository*  
+>   **Ninh:** awesome, it works!
 
 This is not something that can be achieved with Monit/God. Monit/God are for
 monitoring daemons, auto-restarting them when they use too much resources.
