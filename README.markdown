@@ -217,21 +217,21 @@ or [God](http://god.rubyforge.org/). Rather, it is a solution to the following
 problem:
 
 > **Hongli:** hey Ninh, do a 'git pull', I just implemented awesome searching
->             features in our application!
->
->   **Ninh:** cool. *pulls from repository*
->   **Ninh:** hey Hongli, it doesn't work.
-> **Hongli:** what do you mean, it doesn't work?
->   Ninh: it says "connection refused", or something
-> Hongli: oh I forgot to mention it, you have to run the Sphinx search daemon
->         before it works. type "rake sphinx:daemon:start" to do that
->   Ninh: great. but now I get a different error. something about BackgrounDRb.
-> Hongli: oops, I forgot to mention this too. you need to start the BackgrounDRb
->         server with "rake backgroundrb:start_server"
->   Ninh: okay, so every time I want to use this app, I have to type
->         "rake sphinx:daemon:start", "rake backgroundrb:start_server" and
->         "./script/server"?
-> Hongli: yep
+>             features in our application!  
+>   **Ninh:** cool. *pulls from repository*  
+>   **Ninh:** hey Hongli, it doesn't work.  
+> **Hongli:** what do you mean, it doesn't work?  
+>   **Ninh:** it says "connection refused", or something  
+> **Hongli:** oh I forgot to mention it, you have to run the Sphinx search
+>             daemon before it works. type "rake sphinx:daemon:start" to do
+>             that  
+> **  Ninh:** great. but now I get a different error. something about BackgrounDRb.  
+> **Hongli:** oops, I forgot to mention this too. you need to start the BackgrounDRb
+>             server with "rake backgroundrb:start_server"  
+> **  Ninh:** okay, so every time I want to use this app, I have to type
+>             "rake sphinx:daemon:start", "rake backgroundrb:start_server" and
+>             "./script/server"?  
+> **Hongli:** yep  
 
 Imagine the above conversation becoming just:
 
