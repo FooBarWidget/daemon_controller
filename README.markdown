@@ -216,12 +216,12 @@ daemon_controller is not a replacement for [Monit](http://www.tildeslash.com/mon
 or [God](http://god.rubyforge.org/). Rather, it is a solution to the following
 problem:
 
-> *Hongli:* hey Ninh, do a 'git pull', I just implemented awesome searching
->         features in our application!
+> **Hongli:** hey Ninh, do a 'git pull', I just implemented awesome searching
+>             features in our application!
 >
->   Ninh: cool. *pulls from repository*
->   Ninh: hey Hongli, it doesn't work.
-> Hongli: what do you mean, it doesn't work?
+>   **Ninh:** cool. *pulls from repository*
+>   **Ninh:** hey Hongli, it doesn't work.
+> **Hongli:** what do you mean, it doesn't work?
 >   Ninh: it says "connection refused", or something
 > Hongli: oh I forgot to mention it, you have to run the Sphinx search daemon
 >         before it works. type "rake sphinx:daemon:start" to do that
