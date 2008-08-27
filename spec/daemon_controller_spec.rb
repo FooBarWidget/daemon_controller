@@ -165,8 +165,12 @@ describe DaemonController, "#start" do
 		@controller.should_receive(:start_timed_out).and_return do
 			end_time = Time.now
 		end
-		lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
-		(min_start_timeout .. max_start_timeout).should === end_time - start_time
+		begin
+			lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
+			(min_start_timeout .. max_start_timeout).should === end_time - start_time
+		ensure
+			@controller.stop
+		end
 	end
 	
 	it "kills the daemon with a signal if the daemon doesn't start in time and there's a PID file" do
@@ -178,7 +182,14 @@ describe DaemonController, "#start" do
 			end
 			pid = @controller.send(:read_pid_file)
 		end
-		lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
+		begin
+			lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
+		ensure
+			# It's possible that because of a racing condition, the PID
+			# file doesn't get deleted before the next test is run. So
+			# here we ensure that the PID file is gone.
+			File.unlink("echo_server.pid") rescue nil
+		end
 	end
 	
 	if DaemonController.send(:fork_supported?)
