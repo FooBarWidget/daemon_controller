@@ -519,7 +519,9 @@ private
 				raise StartError, File.read(tempfile_path).strip
 			end
 		else
-			if !system("#{command} >\"#{tempfile_path}\" 2>\"#{tempfile_path}\"")
+			cmd = "#{command} >\"#{tempfile_path}\""
+			cmd += " 2>\"#{tempfile_path}\"" unless PLATFORM =~ /mswin/
+			if !system(cmd)
 				raise StartError, File.read(tempfile_path).strip
 			end
 		end
