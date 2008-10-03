@@ -44,5 +44,5 @@ class LockFile
 			yield
 		end
 	end
-end # class PidFile
+end # class LockFile
 end # class DaemonController
