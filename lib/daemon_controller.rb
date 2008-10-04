@@ -26,7 +26,7 @@ require File.expand_path(File.dirname(__FILE__) << '/daemon_controller/lock_file
 # Main daemon controller object. See the README for an introduction and tutorial.
 class DaemonController
 	ALLOWED_CONNECT_EXCEPTIONS = [Errno::ECONNREFUSED, Errno::ENETUNREACH,
-		Errno::ETIMEDOUT, Errno::ECONNRESET]
+		Errno::ETIMEDOUT, Errno::ECONNRESET, Errno::EINVAL]
 	
 	class Error < StandardError
 	end
