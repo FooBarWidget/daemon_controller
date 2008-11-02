@@ -21,6 +21,7 @@
 
 require 'tempfile'
 require 'fcntl'
+require 'timeout'
 require File.expand_path(File.dirname(__FILE__) << '/daemon_controller/lock_file')
 
 # Main daemon controller object. See the README for an introduction and tutorial.
