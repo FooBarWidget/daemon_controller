@@ -498,6 +498,11 @@ private
 				STDIN.reopen("/dev/null", "r")
 				STDOUT.reopen(tempfile_path, "w")
 				STDERR.reopen(tempfile_path, "w")
+				ObjectSpace.each_object(IO) do |obj|
+					if STDIN != obj && STDOUT != obj && STDERR != obj
+						obj.close rescue nil
+					end
+				end
 				exec(command)
 			end
 			begin
