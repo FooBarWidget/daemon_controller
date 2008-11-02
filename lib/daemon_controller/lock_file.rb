@@ -21,6 +21,9 @@
 
 class DaemonController
 class LockFile
+	class AlreadyLocked < StandardError
+	end
+	
 	def initialize(filename)
 		@filename = filename
 	end
@@ -42,6 +45,32 @@ class LockFile
 			end
 			f.flock(File::LOCK_SH)
 			yield
+		end
+	end
+	
+	def try_shared_lock
+		File.open(@filename, 'w') do |f|
+			if Fcntl.const_defined? :F_SETFD
+				f.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC)
+			end
+			if f.flock(File::LOCK_SH | File::LOCK_NB)
+				yield
+			else
+				raise AlreadyLocked
+			end
+		end
+	end
+	
+	def try_exclusive_lock
+		File.open(@filename, 'w') do |f|
+			if Fcntl.const_defined? :F_SETFD
+				f.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC)
+			end
+			if f.flock(File::LOCK_EX | File::LOCK_NB)
+				yield
+			else
+				raise AlreadyLocked
+			end
 		end
 	end
 end # class LockFile
