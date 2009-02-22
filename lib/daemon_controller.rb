@@ -27,7 +27,8 @@ require File.expand_path(File.dirname(__FILE__) << '/daemon_controller/lock_file
 # Main daemon controller object. See the README for an introduction and tutorial.
 class DaemonController
 	ALLOWED_CONNECT_EXCEPTIONS = [Errno::ECONNREFUSED, Errno::ENETUNREACH,
-		Errno::ETIMEDOUT, Errno::ECONNRESET, Errno::EINVAL]
+		Errno::ETIMEDOUT, Errno::ECONNRESET, Errno::EINVAL,
+		Errno::EADDRNOTAVAIL]
 	
 	class Error < StandardError
 	end
@@ -72,8 +73,8 @@ class DaemonController
 	#  The value may also be a Proc, which returns an expression that evaluates to
 	#  true (indicating that the daemon can be connected to) or false (failure).
 	#  If the Proc raises Errno::ECONNREFUSED, Errno::ENETUNREACH, Errno::ETIMEDOUT
-	#  or Errno::ECONNRESET, then that also means that the daemon cannot be connected
-	#  to.
+	#  or Errno::ECONNRESET, Errno::EINVAL and Errno::EADDRNOTAVAIL then that also
+	#  means that the daemon cannot be connected to.
 	#  <b>NOTE:</b> if the ping command returns an object which responds to
 	#  <tt>#close</tt>, then that method will be called on the return value.
 	#  This makes it possible to specify a ping command such as
@@ -170,7 +171,8 @@ class DaemonController
 	# started.
 	#
 	# The block must return nil or raise Errno::ECONNREFUSED, Errno::ENETUNREACH,
-	# Errno::ETIMEDOUT, Errno::ECONNRESET to indicate that the daemon cannot be
+	# Errno::ETIMEDOUT, Errno::ECONNRESET, Errno::EINVAL and Errno::EADDRNOTAVAIL
+	# to indicate that the daemon cannot be
 	# connected to. It must return non-nil if the daemon can be connected to.
 	# Upon successful connection, the return value of the block will
 	# be returned by #connect.
@@ -198,10 +200,12 @@ class DaemonController
 				if !daemon_is_running?
 					start_without_locking
 				end
+				connect_exception = nil
 				begin
 					connection = yield
-				rescue *ALLOWED_CONNECT_EXCEPTIONS
+				rescue *ALLOWED_CONNECT_EXCEPTIONS => e
 					connection = nil
+					connect_exception = e
 				end
 				if connection.nil?
 					# Daemon is running but we couldn't connect to it. Possible
@@ -209,7 +213,11 @@ class DaemonController
 					# - The daemon froze.
 					# - Bizarre security restrictions.
 					# - There's a bug in the yielded code.
-					raise ConnectError, "Cannot connect to the daemon"
+					if connect_exception
+						raise ConnectError, "Cannot connect to the daemon: #{connect_exception} (#{connect_exception.class})"
+					else
+						raise ConnectError, "Cannot connect to the daemon"
+					end
 				else
 					return connection
 				end
