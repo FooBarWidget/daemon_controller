@@ -420,6 +420,13 @@ when the daemon is designed from the beginning with such abilities in mind, but
 it's compatible with virtually all daemons, and is easy to use.
 
 
+Concurrency notes
+=================
+DaemonController can only guarantee concurrency safety between multiple threads
+in the same process, if all of those threads use the same DaemonController
+object. Synchronization between multiple processes works fine.
+
+
 API documentation
 =================
 

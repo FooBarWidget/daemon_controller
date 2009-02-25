@@ -19,6 +19,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+require 'fcntl'
+
 class DaemonController
 
 # A lock file is a synchronization mechanism, like a Mutex, but it also allows
@@ -30,6 +32,10 @@ class DaemonController
 # exclusive lock has been obtained by a process. If a process has obtained an
 # exclusive lock, then no other processes can lock the file, whether they're
 # trying to obtain a shared lock or an exclusive lock.
+#
+# Note that on JRuby, LockFile can only guarantee synchronization between
+# threads if the different threads use the same LockFile object. Specifying the
+# same filename is not enough.
 class LockFile
 	class AlreadyLocked < StandardError
 	end
