@@ -13,6 +13,7 @@ Gem::Specification.new do |s|
       "README.markdown", "LICENSE.txt", "daemon_controller.gemspec",
       "lib/daemon_controller.rb",
       "lib/daemon_controller/lock_file.rb",
+      "spec/test_helper.rb",
       "spec/daemon_controller_spec.rb",
       "spec/echo_server.rb"
   ]

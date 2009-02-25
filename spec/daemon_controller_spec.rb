@@ -1,85 +1,14 @@
-$LOAD_PATH << File.expand_path(File.join(File.dirname(__FILE__), "..", "lib"))
-Dir.chdir(File.dirname(__FILE__))
+require File.join(File.dirname(__FILE__), "test_helper")
 require 'daemon_controller'
 require 'benchmark'
 require 'socket'
-
-# A thread which doesn't execute its block until the
-# 'go!' method has been called.
-class WaitingThread < Thread
-	def initialize
-		super do
-			@mutex = Mutex.new
-			@cond = ConditionVariable.new
-			@go = false
-			@mutex.synchronize do
-				while !@go
-					@cond.wait(@mutex)
-				end
-			end
-			yield
-		end
-	end
-	
-	def go!
-		@mutex.synchronize do
-			@go = true
-			@cond.broadcast
-		end
-	end
-end
-
-module TestHelpers
-	def new_controller(options = {})
-		start_command = './echo_server.rb -l echo_server.log -P echo_server.pid'
-		if options[:wait1]
-			start_command << " --wait1 #{options[:wait1]}"
-		end
-		if options[:wait2]
-			start_command << " --wait2 #{options[:wait2]}"
-		end
-		if options[:stop_time]
-			start_command << " --stop-time #{options[:stop_time]}"
-		end
-		if options[:crash_before_bind]
-			start_command << " --crash-before-bind"
-		end
-		new_options = {
-			:identifier    => 'My Test Daemon',
-			:start_command => start_command,
-			:ping_command  => proc do
-				begin
-					TCPSocket.new('localhost', 3230)
-					true
-				rescue SystemCallError
-					false
-				end
-			end,
-			:pid_file      => 'echo_server.pid',
-			:log_file      => 'echo_server.log',
-			:start_timeout => 3,
-			:stop_timeout  => 3
-		}.merge(options)
-		@controller = DaemonController.new(new_options)
-	end
-	
-	def write_file(filename, contents)
-		File.open(filename, 'w') do |f|
-			f.write(contents)
-		end
-	end
-	
-	def exec_is_slow?
-		return RUBY_PLATFORM == "java"
-	end
-end
 
 describe DaemonController, "#start" do
 	before :each do
 		new_controller
 	end
 	
-	include TestHelpers
+	include TestHelper
 	
 	it "works" do
 		@controller.start
@@ -92,19 +21,19 @@ describe DaemonController, "#start" do
 	end
 	
 	it "deletes existing PID file before starting the daemon" do
-		write_file('echo_server.pid', '1234')
+		write_file('spec/echo_server.pid', '1234')
 		@controller.should_receive(:daemon_is_running?).and_return(false)
 		@controller.should_receive(:spawn_daemon)
 		@controller.should_receive(:pid_file_available?).and_return(true)
 		@controller.should_receive(:run_ping_command).at_least(:once).and_return(true)
 		@controller.start
-		File.exist?('echo_server.pid').should be_false
+		File.exist?('spec/echo_server.pid').should be_false
 	end
 	
 	it "blocks until the daemon has written to its PID file" do
 		thread = WaitingThread.new do
 			sleep 0.15
-			write_file('echo_server.pid', '1234')
+			write_file('spec/echo_server.pid', '1234')
 		end
 		@controller.should_receive(:daemon_is_running?).and_return(false)
 		@controller.should_receive(:spawn_daemon).and_return do
@@ -188,14 +117,14 @@ describe DaemonController, "#start" do
 			# It's possible that because of a racing condition, the PID
 			# file doesn't get deleted before the next test is run. So
 			# here we ensure that the PID file is gone.
-			File.unlink("echo_server.pid") rescue nil
+			File.unlink("spec/echo_server.pid") rescue nil
 		end
 	end
 	
 	if DaemonController.send(:fork_supported?)
 		it "kills the daemon if it doesn't start in time and hasn't " <<
 		   "forked yet, on platforms where Ruby supports fork()" do
-			new_controller(:start_command => '(echo $$ > echo_server.pid && sleep 5)',
+			new_controller(:start_command => '(echo $$ > spec/echo_server.pid && sleep 5)',
 				:start_timeout => 0.3)
 			lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
 		end
@@ -232,10 +161,14 @@ describe DaemonController, "#start" do
 end
 
 describe DaemonController, "#stop" do
-	include TestHelpers
+	include TestHelper
 	
 	before :each do
 		new_controller
+	end
+	
+	after :each do
+		@controller.stop
 	end
 	
 	it "raises no exception if the daemon is not running" do
@@ -283,7 +216,7 @@ describe DaemonController, "#stop" do
 end
 
 describe DaemonController, "#connect" do
-	include TestHelpers
+	include TestHelper
 	
 	before :each do
 		new_controller
@@ -311,7 +244,7 @@ describe DaemonController, "#connect" do
 end
 
 describe DaemonController do
-	include TestHelpers
+	include TestHelper
 	
 	specify "if the ping command is a block that raises Errno::ECONNREFUSED, then that's " <<
 	        "an indication that the daemon cannot be connected to" do
