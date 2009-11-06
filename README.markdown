@@ -25,8 +25,20 @@ It provides the following functionality:
 *   Stopping daemons.
 *   Checking whether a daemon is running.
 
+## Installation
 
-## What is it for?
+    gem install daemon_controller
+
+
+## Resources
+
+*   [Website](http://github.com/FooBarWidget/daemon_controller)
+*   [Git repository](git://github.com/FooBarWidget/daemon_controller.git)
+*   [RubyForge project](http://rubyforge.org/projects/daemoncontrol/)
+
+
+What is it for?
+===============
 
 There is a lot of software (both Rails related and unrelated) which rely on
 servers or daemons. To name a few, in no particular order:
