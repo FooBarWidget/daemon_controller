@@ -235,7 +235,7 @@ class DaemonController
 	def stop
 		@lock_file.exclusive_lock do
 			begin
-				Timeout.timeout(@stop_timeout) do
+				Timeout.timeout(@stop_timeout, Timeout::Error) do
 					kill_daemon
 					wait_until do
 						!daemon_is_running?
@@ -283,7 +283,7 @@ private
 		begin
 			started = false
 			before_start
-			Timeout.timeout(@start_timeout) do
+			Timeout.timeout(@start_timeout, Timeout::Error) do
 				done = false
 				spawn_daemon
 				record_activity
@@ -513,6 +513,9 @@ private
 				end
 				exec(command)
 			end
+			
+			# run_command might be running in a timeout block (like
+			# in #start_without_locking).
 			begin
 				Process.waitpid(pid) rescue nil
 			rescue Timeout::Error
@@ -520,7 +523,7 @@ private
 				# in time, then kill it.
 				Process.kill('SIGTERM', pid) rescue nil
 				begin
-					Timeout.timeout(5) do
+					Timeout.timeout(5, Timeout::Error) do
 						Process.waitpid(pid) rescue nil
 					end
 				rescue Timeout::Error
