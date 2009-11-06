@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name = "daemon_controller"
-  s.version = "0.2.1"
-  s.date = "2009-02-22"
+  s.version = "0.2.2"
+  s.date = "2009-11-06"
   s.summary = "A library for implementing daemon management capabilities"
   s.email = "hongli@phusion.nl"
   s.homepage = "http://github.com/FooBarWidget/daemon_controller/tree/master"
