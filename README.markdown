@@ -1,6 +1,33 @@
 Introduction
 ============
 
+*daemon_controller* is a library for starting and stopping specific daemons
+programmatically in a robust, race-condition-free manner.
+
+It's not a daemon monitoring system like God or Monit. It's also not a library
+for writing daemons.
+
+It provides the following functionality:
+
+*   Starting daemons. If the daemon fails to start then an exception will be
+    raised. *daemon_controller* can even detect failures that occur after the
+    daemon has already daemonized.
+    
+    Starting daemons is done in a race-condition-free manner. If another
+    process using *daemon_controller* is trying to start the same daemon,
+    then *daemon_controller* will guarantee serialization.
+    
+    *daemon_controller* also raises an exception if it detects that the daemon
+    is already started.
+*   Connecting to a daemon, starting it if it's not already started. This too
+    is done in a race-condition-free manner. If the daemon fails to start then
+    an exception will be raised.
+*   Stopping daemons.
+*   Checking whether a daemon is running.
+
+
+## What is it for?
+
 There is a lot of software (both Rails related and unrelated) which rely on
 servers or daemons. To name a few, in no particular order:
 
@@ -86,8 +113,7 @@ all daemon controlling software supports this. Why can't all software check for
 stale PID files automatically?
 
 
-Implementation problems
-=======================
+## Implementation issues
 
 From the problem descriptions, it would become apparent that our wishlist is as
 follows. Why is this wishlist often not implemented? Let's go over them.
@@ -217,27 +243,27 @@ or [God](http://god.rubyforge.org/). Rather, it is a solution to the following
 problem:
 
 > **Hongli:** hey Ninh, do a 'git pull', I just implemented awesome searching
->             features in our application!  
+>    features in our application!  
 >   **Ninh:** cool. *pulls from repository*  
 >   **Ninh:** hey Hongli, it doesn't work.  
 > **Hongli:** what do you mean, it doesn't work?  
 >   **Ninh:** it says "connection refused", or something  
 > **Hongli:** oh I forgot to mention it, you have to run the Sphinx search
->             daemon before it works. type "rake sphinx:daemon:start" to do
->             that  
+>    daemon before it works. type "rake sphinx:daemon:start" to do
+>    that  
 >   **Ninh:** great. but now I get a different error. something about
->             BackgrounDRb.  
+>    BackgrounDRb.  
 > **Hongli:** oops, I forgot to mention this too. you need to start the
->             BackgrounDRb server with "rake backgroundrb:start_server"  
+>    BackgrounDRb server with "rake backgroundrb:start_server"  
 >   **Ninh:** okay, so every time I want to use this app, I have to type
->             "rake sphinx:daemon:start", "rake backgroundrb:start_server" and
->             "./script/server"?  
+>    "rake sphinx:daemon:start", "rake backgroundrb:start_server" and
+>    "./script/server"?  
 > **Hongli:** yep
 
 Imagine the above conversation becoming just:
 
 > **Hongli:** hey Ninh, do a 'git pull', I just implemented awesome searching
->             features in our application!  
+>    features in our application!  
 >   **Ninh:** cool. *pulls from repository*  
 >   **Ninh:** awesome, it works!
 
