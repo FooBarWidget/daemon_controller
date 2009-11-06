@@ -84,7 +84,7 @@ pid = fork do
 			exit 2
 		end
 		
-		server = TCPServer.new('localhost', options[:port])
+		server = TCPServer.new('127.0.0.1', options[:port])
 		begin
 			puts "*** #{Time.now}: echo server started"
 			while (client = server.accept)

@@ -22,7 +22,7 @@ module TestHelper
 			:start_command => start_command,
 			:ping_command  => proc do
 				begin
-					TCPSocket.new('localhost', 3230)
+					TCPSocket.new('127.0.0.1', 3230)
 					true
 				rescue SystemCallError
 					false
