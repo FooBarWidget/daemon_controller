@@ -503,14 +503,12 @@ private
 		
 		if self.class.fork_supported?
 			pid = safe_fork do
+				ObjectSpace.each_object(IO) do |obj|
+					obj.close rescue nil
+				end
 				STDIN.reopen("/dev/null", "r")
 				STDOUT.reopen(tempfile_path, "w")
 				STDERR.reopen(tempfile_path, "w")
-				ObjectSpace.each_object(IO) do |obj|
-					if STDIN != obj && STDOUT != obj && STDERR != obj
-						obj.close rescue nil
-					end
-				end
 				exec(command)
 			end
 			
