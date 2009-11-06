@@ -51,10 +51,10 @@ end
 # 'go!' method has been called.
 class WaitingThread < Thread
 	def initialize
+		@mutex = Mutex.new
+		@cond = ConditionVariable.new
+		@go = false
 		super do
-			@mutex = Mutex.new
-			@cond = ConditionVariable.new
-			@go = false
 			@mutex.synchronize do
 				while !@go
 					@cond.wait(@mutex)

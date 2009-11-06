@@ -1,4 +1,4 @@
-require File.join(File.dirname(__FILE__), "test_helper")
+require File.expand_path(File.join(File.dirname(__FILE__), "test_helper"))
 require 'daemon_controller'
 require 'benchmark'
 require 'socket'
@@ -181,8 +181,8 @@ describe DaemonController, "#stop" do
 		result = Benchmark.measure do
 			@controller.stop
 		end
-		@controller.running?.should be_false
-		(0.3 .. 0.5).should === result.real
+		@controller.should_not be_running
+		(0.3 .. 0.6).should === result.real
 	end
 	
 	it "raises StopTimeout if the daemon does not stop in time" do

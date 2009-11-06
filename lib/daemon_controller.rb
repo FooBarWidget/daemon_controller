@@ -501,32 +501,58 @@ private
 		File.chmod(0666, tempfile_path)
 		tempfile.close
 		
-		if self.class.fork_supported?
-			pid = safe_fork do
-				ObjectSpace.each_object(IO) do |obj|
-					obj.close rescue nil
+		if self.class.fork_supported? || Process.respond_to?(:spawn)
+			if Process.respond_to?(:spawn)
+				pid = Process.spawn(command,
+					:in  => "/dev/null",
+					:out => tempfile_path,
+					:err => tempfile_path,
+					:close_others => true
+				)
+			else
+				pid = safe_fork do
+					ObjectSpace.each_object(IO) do |obj|
+						obj.close rescue nil
+					end
+					STDIN.reopen("/dev/null", "r")
+					STDOUT.reopen(tempfile_path, "w")
+					STDERR.reopen(tempfile_path, "w")
+					exec(command)
 				end
-				STDIN.reopen("/dev/null", "r")
-				STDOUT.reopen(tempfile_path, "w")
-				STDERR.reopen(tempfile_path, "w")
-				exec(command)
 			end
 			
 			# run_command might be running in a timeout block (like
 			# in #start_without_locking).
 			begin
-				Process.waitpid(pid) rescue nil
+				interruptable_waitpid(pid)
+			rescue Errno::ECHILD
+				# Maybe a background thread or whatever waitpid()'ed
+				# this child process before we had the chance. There's
+				# no way to obtain the exit status now. Assume that
+				# it started successfully; if it didn't we'll know
+				# that later by checking the PID file and by pinging
+				# it.
+				return
 			rescue Timeout::Error
 				# If the daemon doesn't fork into the background
 				# in time, then kill it.
-				Process.kill('SIGTERM', pid) rescue nil
+				begin
+					Process.kill('SIGTERM', pid)
+				rescue SystemCallError
+				end
 				begin
 					Timeout.timeout(5, Timeout::Error) do
-						Process.waitpid(pid) rescue nil
+						begin
+							interruptable_waitpid(pid)
+						rescue SystemCallError
+						end
 					end
 				rescue Timeout::Error
-					Process.kill('SIGKILL', pid)
-					Process.waitpid(pid) rescue nil
+					begin
+						Process.kill('SIGKILL', pid)
+						interruptable_waitpid(pid)
+					rescue SystemCallError
+					end
 				end
 				raise
 			end
@@ -576,6 +602,25 @@ private
 			end
 		else
 			return pid
+		end
+	end
+	
+	if RUBY_VERSION < "1.9"
+		def interruptable_waitpid(pid)
+			Process.waitpid(pid)
+		end
+	else
+		# On Ruby 1.9, Thread#kill (which is called by timeout.rb) may
+		# not be able to interrupt Process.waitpid. So here we use a
+		# special version that's a bit less efficient but is at least
+		# interruptable.
+		def interruptable_waitpid(pid)
+			result = nil
+			while !result
+				result = Process.waitpid(pid, Process::WNOHANG)
+				sleep 0.01 if !result
+			end
+			return result
 		end
 	end
 end
