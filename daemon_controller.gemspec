@@ -1,7 +1,8 @@
 Gem::Specification.new do |s|
   s.name = "daemon_controller"
-  s.version = "0.2.2"
-  s.date = "2009-11-06"
+  # Don't forget to update version.rb too.
+  s.version = "0.2.3"
+  s.date = "2009-11-13"
   s.summary = "A library for implementing daemon management capabilities"
   s.email = "hongli@phusion.nl"
   s.homepage = "http://github.com/FooBarWidget/daemon_controller/tree/master"
@@ -13,6 +14,7 @@ Gem::Specification.new do |s|
       "README.markdown", "LICENSE.txt", "daemon_controller.gemspec",
       "lib/daemon_controller.rb",
       "lib/daemon_controller/lock_file.rb",
+      "lib/daemon_controller/version.rb",
       "spec/test_helper.rb",
       "spec/daemon_controller_spec.rb",
       "spec/echo_server.rb"
