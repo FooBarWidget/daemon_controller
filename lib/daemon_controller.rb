@@ -125,8 +125,8 @@ class DaemonController
 	# [:log_file_activity_timeout]
 	#  Once a daemon has gone into the background, it will become difficult to
 	#  know for certain whether it is still initializing or whether it has
-	#  failed and exited, until it has written its PID file. It's 99.9% probable
-	#  that the daemon has terminated with an if its start timeout has expired,
+	#  failed and exited, until it has written its PID file. Suppose that it
+	#  failed with an error after daemonizing but before it has written its PID file;
 	#  not many system administrators want to wait 15 seconds (the default start
 	#  timeout) to be notified of whether the daemon has terminated with an error.
 	#  

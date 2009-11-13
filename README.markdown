@@ -29,10 +29,10 @@ It provides the following functionality:
 
     gem install daemon_controller
 
-
 ## Resources
 
 *   [Website](http://github.com/FooBarWidget/daemon_controller)
+*   [RDoc](http://rdoc.info/projects/FooBarWidget/daemon_controller)
 *   [Git repository](git://github.com/FooBarWidget/daemon_controller.git)
 *   [RubyForge project](http://rubyforge.org/projects/daemoncontrol/)
 
