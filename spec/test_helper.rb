@@ -4,22 +4,22 @@ Dir.chdir(root)
 
 module TestHelper
 	def new_controller(options = {})
-		start_command = './spec/echo_server.rb -l spec/echo_server.log -P spec/echo_server.pid'
+		@start_command = './spec/echo_server.rb -l spec/echo_server.log -P spec/echo_server.pid'
 		if options[:wait1]
-			start_command << " --wait1 #{options[:wait1]}"
+			@start_command << " --wait1 #{options[:wait1]}"
 		end
 		if options[:wait2]
-			start_command << " --wait2 #{options[:wait2]}"
+			@start_command << " --wait2 #{options[:wait2]}"
 		end
 		if options[:stop_time]
-			start_command << " --stop-time #{options[:stop_time]}"
+			@start_command << " --stop-time #{options[:stop_time]}"
 		end
 		if options[:crash_before_bind]
-			start_command << " --crash-before-bind"
+			@start_command << " --crash-before-bind"
 		end
 		new_options = {
 			:identifier    => 'My Test Daemon',
-			:start_command => start_command,
+			:start_command => @start_command,
 			:ping_command  => proc do
 				begin
 					TCPSocket.new('127.0.0.1', 3230)

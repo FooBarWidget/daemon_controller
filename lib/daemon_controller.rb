@@ -59,7 +59,11 @@ class DaemonController
 	#  
 	# [:start_command]
 	#  The command to start the daemon. This must be a a String, e.g.
-	#  "mongrel_rails start -e production".
+	#  "mongrel_rails start -e production", or a Proc which returns a String.
+	#  
+	#  If the value is a Proc, and the +before_start+ option is given too, then
+	#  the +start_command+ Proc is guaranteed to be called after the +before_start+
+	#  Proc is called.
 	#  
 	# [:ping_command]
 	#  The ping command is used to check whether the daemon can be connected to.
@@ -341,7 +345,11 @@ private
 	end
 	
 	def spawn_daemon
-		run_command(@start_command)
+		if @start_command.respond_to?(:call)
+			run_command(@start_command.call)
+		else
+			run_command(@start_command)
+		end
 	end
 	
 	def kill_daemon

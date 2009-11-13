@@ -158,6 +158,34 @@ describe DaemonController, "#start" do
 			e.message.should =~ /crashing, as instructed/
 		end
 	end
+	
+	specify "the start command may be a Proc" do
+		called = true
+		new_controller(:start_command => lambda { called = true; @start_command })
+		begin
+			@controller.start
+		ensure
+			@controller.stop
+		end
+		called.should be_true
+	end
+	
+	specify "if the start command is a Proc then it is called after before_start" do
+		log = []
+		new_controller(
+			:start_command => lambda {
+				log << "start_command"
+				@start_command
+			},
+			:before_start => lambda { log << "before_start" }
+		)
+		begin
+			@controller.start
+		ensure
+			@controller.stop
+		end
+		log.should == ["before_start", "start_command"]
+	end
 end
 
 describe DaemonController, "#stop" do
