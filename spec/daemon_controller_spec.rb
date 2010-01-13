@@ -209,28 +209,30 @@ describe DaemonController, "#start" do
 		log.should == ["before_start", "start_command"]
 	end
 	
-	it "keeps the file descriptors in 'keep_ios' open" do
-		a, b = IO.pipe
-		begin
-			new_controller(:keep_ios => [b])
+	if DaemonController.send(:fork_supported?) || Process.respond_to?(:spawn)
+		it "keeps the file descriptors in 'keep_ios' open" do
+			a, b = IO.pipe
 			begin
-				@controller.start
-				b.close
-				select([a], nil, nil, 0).should be_nil
+				new_controller(:keep_ios => [b])
+				begin
+					@controller.start
+					b.close
+					select([a], nil, nil, 0).should be_nil
+				ensure
+					@controller.stop
+				end
 			ensure
-				@controller.stop
+				a.close if !a.closed?
+				b.close if !b.closed?
 			end
-		ensure
-			a.close if !a.closed?
-			b.close if !b.closed?
 		end
-	end
-	
-	it "performs the daemonization on behalf of the daemon if 'daemonize_for_me' is set" do
-		new_controller(:no_daemonize => true, :daemonize_for_me => true)
-		@controller.start
-		ping_echo_server.should be_true
-		@controller.stop
+		
+		it "performs the daemonization on behalf of the daemon if 'daemonize_for_me' is set" do
+			new_controller(:no_daemonize => true, :daemonize_for_me => true)
+			@controller.start
+			ping_echo_server.should be_true
+			@controller.stop
+		end
 	end
 end
 
