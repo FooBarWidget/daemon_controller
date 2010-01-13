@@ -137,6 +137,12 @@ class DaemonController
 	#  have terminated with an error.
 	#  
 	#  The default value is 7.
+	#
+	# [:keep_ios]
+	#  Upon spawning the daemon, daemon_controller will normally close all file
+	#  descriptors except stdin, stdout and stderr. However if there are any file
+	#  descriptors you want to keep open, specify the IO objects here. This must be
+	#  an array of IO objects.
 	def initialize(options)
 		[:identifier, :start_command, :ping_command, :pid_file, :log_file].each do |option|
 			if !options.has_key?(option)
@@ -154,6 +160,7 @@ class DaemonController
 		@start_timeout = options[:start_timeout] || 15
 		@stop_timeout = options[:stop_timeout] || 15
 		@log_file_activity_timeout = options[:log_file_activity_timeout] || 7
+		@keep_ios = options[:keep_ios] || []
 		@lock_file = determine_lock_file(@identifier, @pid_file)
 	end
 	
@@ -511,16 +518,22 @@ private
 		
 		if self.class.fork_supported? || Process.respond_to?(:spawn)
 			if Process.respond_to?(:spawn)
-				pid = Process.spawn(command,
-					:in  => "/dev/null",
-					:out => tempfile_path,
-					:err => tempfile_path,
+				options = {
+					STDIN  => "/dev/null",
+					STDOUT => tempfile_path,
+					STDERR => tempfile_path,
 					:close_others => true
-				)
+				}
+				@keep_ios.each do |io|
+					options[io] = io
+				end
+				pid = Process.spawn(command, options)
 			else
 				pid = safe_fork do
 					ObjectSpace.each_object(IO) do |obj|
-						obj.close rescue nil
+						if !@keep_ios.include?(obj)
+							obj.close rescue nil
+						end
 					end
 					STDIN.reopen("/dev/null", "r")
 					STDOUT.reopen(tempfile_path, "w")

@@ -186,6 +186,23 @@ describe DaemonController, "#start" do
 		end
 		log.should == ["before_start", "start_command"]
 	end
+	
+	it "keeps the file descriptors in 'keep_ios' open" do
+		a, b = IO.pipe
+		begin
+			new_controller(:keep_ios => [b])
+			begin
+				@controller.start
+				b.close
+				select([a], nil, nil, 0).should be_nil
+			ensure
+				@controller.stop
+			end
+		ensure
+			a.close if !a.closed?
+			b.close if !b.closed?
+		end
+	end
 end
 
 describe DaemonController, "#stop" do
