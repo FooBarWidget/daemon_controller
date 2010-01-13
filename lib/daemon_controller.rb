@@ -350,7 +350,7 @@ private
 		rescue Timeout::Error
 			start_timed_out
 			if pid_file_available?
-				kill_daemon_with_signal
+				kill_daemon_with_signal(true)
 			end
 			result = :timeout
 		end
@@ -391,10 +391,14 @@ private
 		end
 	end
 	
-	def kill_daemon_with_signal
+	def kill_daemon_with_signal(force = false)
 		pid = read_pid_file
 		if pid
-			Process.kill('SIGTERM', pid)
+			if force
+				Process.kill('SIGKILL', pid)
+			else
+				Process.kill('SIGTERM', pid)
+			end
 		end
 	rescue Errno::ESRCH, Errno::ENOENT
 	end
@@ -480,6 +484,10 @@ private
 	
 	# This method does nothing and only serves as a hook for the unit test.
 	def start_timed_out
+	end
+	
+	# This method does nothing and only serves as a hook for the unit test.
+	def daemonization_timed_out
 	end
 	
 	def save_log_file_information
@@ -584,6 +592,8 @@ private
 				# it.
 				return
 			rescue Timeout::Error
+				daemonization_timed_out
+				
 				# If the daemon doesn't fork into the background
 				# in time, then kill it.
 				begin

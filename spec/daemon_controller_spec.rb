@@ -103,7 +103,8 @@ describe DaemonController, "#start" do
 		end
 	end
 	
-	it "kills the daemon with a signal if the daemon doesn't start in time and there's a PID file" do
+	it "kills the daemon forcefully if the daemon has forked but doesn't " <<
+	   "become pingable in time, and there's a PID file" do
 		new_controller(:wait2 => 3, :start_timeout => 1)
 		pid = nil
 		@controller.should_receive(:start_timed_out).and_return do
@@ -114,20 +115,38 @@ describe DaemonController, "#start" do
 		end
 		begin
 			lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
+			eventually(1) do
+				!process_is_alive?(pid)
+			end
+			
+			# The daemon should not be able to clean up its PID file since
+			# it's killed with SIGKILL.
+			File.exist?("spec/echo_server.pid").should be_true
 		ensure
-			# It's possible that because of a racing condition, the PID
-			# file doesn't get deleted before the next test is run. So
-			# here we ensure that the PID file is gone.
 			File.unlink("spec/echo_server.pid") rescue nil
 		end
 	end
 	
-	if DaemonController.send(:fork_supported?)
-		it "kills the daemon if it doesn't start in time and hasn't " <<
-		   "forked yet, on platforms where Ruby supports fork()" do
-			new_controller(:start_command => '(echo $$ > spec/echo_server.pid && sleep 5)',
-				:start_timeout => 0.3)
-			lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
+	if DaemonController.send(:fork_supported?) || Process.respond_to?(:spawn)
+		it "kills the daemon if it doesn't start in time and hasn't forked " <<
+		   "yet, on platforms where Ruby supports fork() or Process.spawn" do
+			begin
+				new_controller(:start_command => "./spec/unresponsive_daemon.rb",
+					:start_timeout => 0.2)
+				pid = nil
+				@controller.should_receive(:daemonization_timed_out).and_return do
+					@controller.send(:wait_until) do
+						@controller.send(:pid_file_available?)
+					end
+					pid = @controller.send(:read_pid_file)
+				end
+				lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
+				eventually(1) do
+					!process_is_alive?(pid)
+				end
+			ensure
+				File.unlink("spec/echo_server.pid") rescue nil
+			end
 		end
 	end
 	
@@ -235,7 +254,7 @@ describe DaemonController, "#stop" do
 			@controller.stop
 		end
 		@controller.should_not be_running
-		(0.3 .. 0.6).should === result.real
+		result.real.should be_between(0.3, 0.6)
 	end
 	
 	it "raises StopTimeout if the daemon does not stop in time" do

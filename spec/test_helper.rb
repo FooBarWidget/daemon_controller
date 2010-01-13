@@ -50,6 +50,29 @@ module TestHelper
 	def exec_is_slow?
 		return RUBY_PLATFORM == "java"
 	end
+	
+	def process_is_alive?(pid)
+		begin
+			Process.kill(0, pid)
+			return true
+		rescue Errno::ESRCH
+			return false
+		rescue SystemCallError => e
+			return true
+		end
+	end
+	
+	def eventually(deadline_duration = 1, check_interval = 0.05)
+		deadline = Time.now + deadline_duration
+		while Time.now < deadline
+			if yield
+				return
+			else
+				sleep(check_interval)
+			end
+		end
+		raise "Time limit exceeded"
+	end
 end
 
 # A thread which doesn't execute its block until the
