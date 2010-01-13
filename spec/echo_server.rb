@@ -9,7 +9,8 @@ options = {
 	:log_file => "/dev/null",
 	:wait1 => 0,
 	:wait2 => 0,
-	:stop_time => 0
+	:stop_time => 0,
+	:daemonize => true
 }
 parser = OptionParser.new do |opts|
 	opts.banner = "Usage: echo_server.rb [options]"
@@ -40,6 +41,9 @@ parser = OptionParser.new do |opts|
 	opts.on("--crash-before-bind", "Whether the daemon should crash before binding the server socket.") do
 		options[:crash_before_bind] = true
 	end
+	opts.on("--no-daemonize", "Don't daemonize.") do
+		options[:daemonize] = false
+	end
 end
 begin
 	parser.parse!
@@ -57,60 +61,65 @@ if options[:pid_file]
 	end
 end
 
-pid = fork do
-	Process.setsid
-	fork do
-		STDIN.reopen("/dev/null", 'r')
-		STDOUT.reopen(options[:log_file], 'a')
-		STDERR.reopen(options[:log_file], 'a')
-		STDOUT.sync = true
-		STDERR.sync = true
-		Dir.chdir(options[:chdir])
-		File.umask(0)
-		
-		if options[:pid_file]
-			sleep(options[:wait1])
-			File.open(options[:pid_file], 'w') do |f|
-				f.write(Process.pid)
-			end
-			at_exit do
-				File.unlink(options[:pid_file]) rescue nil
-			end
+def main(options)
+	STDIN.reopen("/dev/null", 'r')
+	STDOUT.reopen(options[:log_file], 'a')
+	STDERR.reopen(options[:log_file], 'a')
+	STDOUT.sync = true
+	STDERR.sync = true
+	Dir.chdir(options[:chdir])
+	File.umask(0)
+	
+	if options[:pid_file]
+		sleep(options[:wait1])
+		File.open(options[:pid_file], 'w') do |f|
+			f.write(Process.pid)
 		end
-		
-		sleep(options[:wait2])
-		if options[:crash_before_bind]
-			puts "#{Time.now}: crashing, as instructed."
-			exit 2
-		end
-		
-		server = TCPServer.new('127.0.0.1', options[:port])
-		begin
-			puts "*** #{Time.now}: echo server started"
-			while (client = server.accept)
-				puts "#{Time.now}: new client"
-				begin
-					while (line = client.readline)
-						puts "#{Time.now}: client sent: #{line.strip}"
-						client.puts(line)
-					end
-				rescue EOFError
-				ensure
-					puts "#{Time.now}: connection closed"
-					client.close rescue nil
-				end
-			end
-		rescue SignalException
-			exit 2
-		rescue => e
-			puts e.to_s
-			puts "    " << e.backtrace.join("\n    ")
-			exit 3
-		ensure
-			puts "*** #{Time.now}: echo server exiting..."
-			sleep(options[:stop_time])
-			puts "*** #{Time.now}: echo server exited"
+		at_exit do
+			File.unlink(options[:pid_file]) rescue nil
 		end
 	end
+	
+	sleep(options[:wait2])
+	if options[:crash_before_bind]
+		puts "#{Time.now}: crashing, as instructed."
+		exit 2
+	end
+	
+	server = TCPServer.new('127.0.0.1', options[:port])
+	begin
+		puts "*** #{Time.now}: echo server started"
+		while (client = server.accept)
+			puts "#{Time.now}: new client"
+			begin
+				while (line = client.readline)
+					puts "#{Time.now}: client sent: #{line.strip}"
+					client.puts(line)
+				end
+			rescue EOFError
+			ensure
+				puts "#{Time.now}: connection closed"
+				client.close rescue nil
+			end
+		end
+	rescue SignalException
+		exit 2
+	rescue => e
+		puts e.to_s
+		puts "    " << e.backtrace.join("\n    ")
+		exit 3
+	ensure
+		puts "*** #{Time.now}: echo server exiting..."
+		sleep(options[:stop_time])
+		puts "*** #{Time.now}: echo server exited"
+	end
 end
-Process.waitpid(pid)
+
+if options[:daemonize]
+	fork do
+		Process.setsid
+		main(options)
+	end
+else
+	main(options)
+end

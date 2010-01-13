@@ -17,23 +17,28 @@ module TestHelper
 		if options[:crash_before_bind]
 			@start_command << " --crash-before-bind"
 		end
+		if options[:no_daemonize]
+			@start_command << " --no-daemonize"
+		end
 		new_options = {
 			:identifier    => 'My Test Daemon',
 			:start_command => @start_command,
-			:ping_command  => proc do
-				begin
-					TCPSocket.new('127.0.0.1', 3230)
-					true
-				rescue SystemCallError
-					false
-				end
-			end,
+			:ping_command  => method(:ping_echo_server),
 			:pid_file      => 'spec/echo_server.pid',
 			:log_file      => 'spec/echo_server.log',
 			:start_timeout => 3,
 			:stop_timeout  => 3
 		}.merge(options)
 		@controller = DaemonController.new(new_options)
+	end
+	
+	def ping_echo_server
+		begin
+			TCPSocket.new('127.0.0.1', 3230)
+			true
+		rescue SystemCallError
+			false
+		end
 	end
 	
 	def write_file(filename, contents)

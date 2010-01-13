@@ -22,13 +22,23 @@
 require 'tempfile'
 require 'fcntl'
 require 'timeout'
-require File.expand_path(File.dirname(__FILE__) << '/daemon_controller/lock_file')
+
+libdir = File.expand_path(File.dirname(__FILE__))
+$LOAD_PATH.unshift(libdir)
+require 'daemon_controller/lock_file'
+
+if Process.respond_to?(:spawn)
+	require 'rbconfig'
+end
 
 # Main daemon controller object. See the README for an introduction and tutorial.
 class DaemonController
 	ALLOWED_CONNECT_EXCEPTIONS = [Errno::ECONNREFUSED, Errno::ENETUNREACH,
 		Errno::ETIMEDOUT, Errno::ECONNRESET, Errno::EINVAL,
 		Errno::EADDRNOTAVAIL]
+	
+	SPAWNER_FILE = File.expand_path(File.join(File.dirname(__FILE__),
+		"daemon_controller", "spawn.rb"))
 	
 	class Error < StandardError
 	end
@@ -138,6 +148,15 @@ class DaemonController
 	#  
 	#  The default value is 7.
 	#
+	# [:daemonize_for_me]
+	#  Normally daemon_controller will wait until the daemon has daemonized into the
+	#  background, in order to capture any errors that it may print on stdout or
+	#  stderr before daemonizing. However, if the daemon doesn't support daemonization
+	#  for some reason, then setting this option to true will cause daemon_controller
+	#  to do the daemonization for the daemon.
+	#  
+	#  The default is false.
+	#
 	# [:keep_ios]
 	#  Upon spawning the daemon, daemon_controller will normally close all file
 	#  descriptors except stdin, stdout and stderr. However if there are any file
@@ -160,6 +179,7 @@ class DaemonController
 		@start_timeout = options[:start_timeout] || 15
 		@stop_timeout = options[:stop_timeout] || 15
 		@log_file_activity_timeout = options[:log_file_activity_timeout] || 7
+		@daemonize_for_me = options[:daemonize_for_me]
 		@keep_ios = options[:keep_ios] || []
 		@lock_file = determine_lock_file(@identifier, @pid_file)
 	end
@@ -527,9 +547,18 @@ private
 				@keep_ios.each do |io|
 					options[io] = io
 				end
-				pid = Process.spawn(command, options)
+				if @daemonize_for_me
+					ruby_interpreter = File.join(
+						Config::CONFIG['bindir'],
+						Config::CONFIG['RUBY_INSTALL_NAME']
+					) + Config::CONFIG['EXEEXT']
+					pid = Process.spawn(ruby_interpreter, SPAWNER_FILE,
+						command, options)
+				else
+					pid = Process.spawn(command, options)
+				end
 			else
-				pid = safe_fork do
+				pid = safe_fork(@daemonize_for_me) do
 					ObjectSpace.each_object(IO) do |obj|
 						if !@keep_ios.include?(obj)
 							obj.close rescue nil
@@ -607,11 +636,18 @@ private
 		end
 	end
 	
-	def safe_fork
+	def safe_fork(double_fork)
 		pid = fork
 		if pid.nil?
 			begin
-				yield
+				if double_fork
+					pid2 = fork
+					if pid2.nil?
+						yield
+					end
+				else
+					yield
+				end
 			rescue Exception => e
 				message = "*** Exception #{e.class} " <<
 					"(#{e}) (process #{$$}):\n" <<
@@ -622,7 +658,12 @@ private
 				exit!
 			end
 		else
-			return pid
+			if double_fork
+				Process.waitpid(pid) rescue nil
+				return pid
+			else
+				return pid
+			end
 		end
 	end
 	

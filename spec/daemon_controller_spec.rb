@@ -12,6 +12,7 @@ describe DaemonController, "#start" do
 	
 	it "works" do
 		@controller.start
+		ping_echo_server.should be_true
 		@controller.stop
 	end
 	
@@ -202,6 +203,13 @@ describe DaemonController, "#start" do
 			a.close if !a.closed?
 			b.close if !b.closed?
 		end
+	end
+	
+	it "performs the daemonization on behalf of the daemon if 'daemonize_for_me' is set" do
+		new_controller(:no_daemonize => true, :daemonize_for_me => true)
+		@controller.start
+		ping_echo_server.should be_true
+		@controller.stop
 	end
 end
 
