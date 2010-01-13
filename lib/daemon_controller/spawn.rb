@@ -20,4 +20,5 @@
 # THE SOFTWARE.
 
 # Used on Ruby 1.9 because forking is not safe.
+Process.setsid
 Process.spawn(ARGV[0])

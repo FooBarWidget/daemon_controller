@@ -643,6 +643,7 @@ private
 				if double_fork
 					pid2 = fork
 					if pid2.nil?
+						Process.setsid
 						yield
 					end
 				else
