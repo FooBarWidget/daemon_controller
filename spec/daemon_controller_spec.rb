@@ -114,7 +114,8 @@ describe DaemonController, "#start" do
 			pid = @controller.send(:read_pid_file)
 		end
 		begin
-			lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
+			block = lambda { @controller.start }
+			block.should raise_error(DaemonController::StartTimeout, /failed to start in time/)
 			eventually(1) do
 				!process_is_alive?(pid)
 			end
@@ -140,7 +141,8 @@ describe DaemonController, "#start" do
 					end
 					pid = @controller.send(:read_pid_file)
 				end
-				lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
+				block = lambda { @controller.start }
+				block.should raise_error(DaemonController::StartTimeout, /didn't daemonize in time/)
 				eventually(1) do
 					!process_is_alive?(pid)
 				end

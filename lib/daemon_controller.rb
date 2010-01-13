@@ -56,6 +56,8 @@ class DaemonController
 	end
 	class ConnectError < Error
 	end
+	class DaemonizationTimeout < TimeoutError
+	end
 
 	# Create a new DaemonController object.
 	#
@@ -347,17 +349,24 @@ private
 				started = run_ping_command
 			end
 			result = started
-		rescue Timeout::Error
+		rescue DaemonizationTimeout, Timeout::Error => e
 			start_timed_out
 			if pid_file_available?
 				kill_daemon_with_signal(true)
 			end
-			result = :timeout
+			if e.is_a?(DaemonizationTimeout)
+				result = :daemonization_timeout
+			else
+				result = :start_timeout
+			end
 		end
 		if !result
 			raise(StartError, differences_in_log_file ||
 				"Daemon '#{@identifier}' failed to start.")
-		elsif result == :timeout
+		elsif result == :daemonization_timeout
+			raise(StartTimeout, differences_in_log_file ||
+				"Daemon '#{@identifier}' didn't daemonize in time.")
+		elsif result == :start_timeout
 			raise(StartTimeout, differences_in_log_file ||
 				"Daemon '#{@identifier}' failed to start in time.")
 		else
@@ -614,7 +623,7 @@ private
 					rescue SystemCallError
 					end
 				end
-				raise
+				raise DaemonizationTimeout
 			end
 			if $?.exitstatus != 0
 				raise StartError, File.read(tempfile_path).strip
