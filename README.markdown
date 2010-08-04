@@ -320,7 +320,7 @@ That can be done with the following code:
        :ping_command  => lambda { TCPSocket.new('localhost', 1234) },
        :pid_file      => 'apache.pid',
        :log_file      => 'apache.log',
-       :timeout       => 25
+       :start_timeout => 25
     )
     controller.start
     
