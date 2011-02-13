@@ -458,11 +458,40 @@ when the daemon is designed from the beginning with such abilities in mind, but
 it's compatible with virtually all daemons, and is easy to use.
 
 
-Concurrency notes
-=================
-DaemonController can only guarantee concurrency safety between multiple threads
-in the same process, if all of those threads use the same DaemonController
-object. Synchronization between multiple processes works fine.
+Concurrency and compatibility notes
+===================================
+DaemonController uses a lock file and the Ruby `File#flock` API to guarantee
+synchronization. This has a few implications:
+
+ * On most Ruby implementations, including MRI, `File#flock` is implemented
+   with the POSIX `flock()` system call or the Windows file locking APIs.
+   This kind of file locking works pretty much the way we expect it would.
+   Multiple threads can safely use daemon_controller concurrently. Multiple
+   processes can safely use daemon_controller concurrently. There will be no
+   race conditions.
+   
+   However `flock()` is not implemented on Solaris. daemon_controller, if
+   used in MRI does not currently work on Solaris. You need to use JRuby
+   which does not use `flock()` to implement `File#flock`.
+   
+ * On JRuby `File#flock` is implemented through the Java file locking API,
+   which on Unix is implemented with the `fcntl()` system calls. This is a
+   different kind of lock with very strange semantics.
+
+   * If *any* process/thread closes the lock file, then the lock on that file
+     will be removed even if that process/thread never requested a lock.
+   * Fcntl locks are usually implemented indepedently from `flock()` locks so
+     if a file is already locked with `flock()` then `fcntl()` will not block
+     when.
+   * The JVM's file locking API only allows inter-process synchronization. It
+     cannot be used to synchronize threads. If a thread has obtained a file
+     lock, then another thread within the same JVM process will not block upon
+     trying to lock the same file.
+   
+   In other words, if you're on JRuby then don't concurrently access
+   daemon_controller from multiple threads without manual locking. Also be
+   careful with mixing MRI processes that use daemon_controller with JRuby
+   processes that use daemon_controller.
 
 
 API documentation
