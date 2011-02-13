@@ -556,9 +556,9 @@ private
 		if self.class.fork_supported? || Process.respond_to?(:spawn)
 			if Process.respond_to?(:spawn)
 				options = {
-					STDIN  => "/dev/null",
-					STDOUT => tempfile_path,
-					STDERR => tempfile_path,
+					:in  => "/dev/null",
+					:out => tempfile_path,
+					:err => tempfile_path,
 					:close_others => true
 				}
 				@keep_ios.each do |io|
