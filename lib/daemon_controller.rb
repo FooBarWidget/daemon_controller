@@ -674,8 +674,9 @@ private
 					"\tfrom " << e.backtrace.join("\n\tfrom ")
 				STDERR.write(e)
 				STDERR.flush
-			ensure
 				exit!
+			ensure
+				exit!(0)
 			end
 		else
 			if double_fork
