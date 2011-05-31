@@ -101,6 +101,10 @@ class DaemonController
 	# [:pid_file]
 	#  The PID file that the daemon will write to. Used to check whether the daemon
 	#  is running.
+	#
+	# [:lock_file]
+	#  The lock file to use for serializing concurrent daemon management operations.
+	#  Defaults to "(filename of PID file).lock".
 	#  
 	# [:log_file]
 	#  The log file that the daemon will write to. It will be consulted to see
@@ -183,7 +187,7 @@ class DaemonController
 		@log_file_activity_timeout = options[:log_file_activity_timeout] || 7
 		@daemonize_for_me = options[:daemonize_for_me]
 		@keep_ios = options[:keep_ios] || []
-		@lock_file = determine_lock_file(@identifier, @pid_file)
+		@lock_file = determine_lock_file(options, @identifier, @pid_file)
 	end
 	
 	# Start the daemon and wait until it can be pinged.
@@ -538,8 +542,12 @@ private
 		return nil
 	end
 	
-	def determine_lock_file(identifier, pid_file)
-		return LockFile.new(File.expand_path(pid_file + ".lock"))
+	def determine_lock_file(options, identifier, pid_file)
+		if options[:lock_file]
+			return LockFile.new(File.expand_path(options[:lock_file]))
+		else
+			return LockFile.new(File.expand_path(pid_file + ".lock"))
+		end
 	end
 	
 	def self.fork_supported?
