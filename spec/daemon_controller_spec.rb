@@ -361,4 +361,28 @@ describe DaemonController do
 			server.close
 		end
 	end
+
+	specify "the ping command may be [:tcp, hostname, port]" do
+		new_controller(:ping_command => [:tcp, "localhost", 8278])
+		@controller.send(:run_ping_command).should be_false
+
+		server = TCPServer.new('localhost', 8278)
+		begin
+			@controller.send(:run_ping_command).should be_true
+		ensure
+			server.close
+		end
+	end
+
+	specify "the ping command may be [:unix, filename]" do
+		new_controller(:ping_command => [:unix, "spec/foo.sock"])
+		@controller.send(:run_ping_command).should be_false
+
+		server = UNIXServer.new('spec/foo.sock')
+		begin
+			@controller.send(:run_ping_command).should be_true
+		ensure
+			server.close
+		end
+	end
 end

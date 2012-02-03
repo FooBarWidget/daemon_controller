@@ -31,10 +31,9 @@ It provides the following functionality:
 
 ## Resources
 
-*   [Website](http://github.com/FooBarWidget/daemon_controller)
+*   [Website](https://github.com/FooBarWidget/daemon_controller)
 *   [RDoc](http://rdoc.info/projects/FooBarWidget/daemon_controller)
 *   [Git repository](git://github.com/FooBarWidget/daemon_controller.git)
-*   [RubyForge project](http://rubyforge.org/projects/daemoncontrol/)
 
 
 What is it for?
@@ -317,7 +316,7 @@ That can be done with the following code:
     controller = DaemonController.new(
        :identifier    => 'Apache web server',
        :start_command => 'apachectl -f apache.conf -k start',
-       :ping_command  => lambda { TCPSocket.new('localhost', 1234) },
+       :ping_command  => [:tcp, 'localhost', 1234],
        :pid_file      => 'apache.pid',
        :log_file      => 'apache.log',
        :start_timeout => 25
@@ -401,7 +400,7 @@ This can be achieved with the following code:
              :identifier => 'Sphinx search server',
              :start_command => "searchd -c config/sphinx.conf",
              :before_start => method(:before_start),
-             :ping_command => lambda { TCPSocket.new('localhost', SEARCH_SERVER_PORT) },
+             :ping_command => [:tcp, 'localhost', SEARCH_SERVER_PORT],
              :pid_file => 'tmp/pids/sphinx.pid',
              :log_file => 'log/sphinx.log')
        end

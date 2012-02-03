@@ -85,6 +85,11 @@ class DaemonController
 	#  The value may be a command string. This command must exit with an exit code of
 	#  0 if the daemon can be successfully connected to, or exit with a non-0 exit
 	#  code on failure.
+	#
+	#  The value may also be an Array which specifies the socket address of the daemon.
+	#  It must be in one of the following forms:
+	#  - [:tcp, host_name, port]
+	#  - [:unix, filename]
 	#  
 	#  The value may also be a Proc, which returns an expression that evaluates to
 	#  true (indicating that the daemon can be connected to) or false (failure).
@@ -658,11 +663,46 @@ private
 			rescue *ALLOWED_CONNECT_EXCEPTIONS
 				return false
 			end
+		elsif @ping_command.is_a?(Array)
+			type, *args = @ping_command
+			
+			case type
+			when :tcp
+				socket_domain = Socket::Constants::AF_INET
+				hostname, port = args
+				sockaddr = Socket.pack_sockaddr_in(port, hostname)
+			when :unix
+				socket_domain = Socket::Constants::AF_LOCAL
+				sockaddr = Socket.pack_sockaddr_un(args[0])
+			else
+				raise ArgumentError, "Unknown ping command type #{type.inspect}"
+			end
+
+			begin
+				socket = Socket.new(socket_domain, Socket::Constants::SOCK_STREAM, 0)
+				begin
+					socket.connect_nonblock(sockaddr)
+				rescue Errno::ENOENT, Errno::EINPROGRESS, Errno::EAGAIN, Errno::EWOULDBLOCK
+					if select(nil, [socket], nil, 0.1)
+						begin
+							socket.connect_nonblock(sockaddr)
+						rescue Errno::EISCONN
+						end
+					else
+						raise Errno::ECONNREFUSED
+					end
+				end
+				return true
+			rescue Errno::ECONNREFUSED, Errno::ENOENT
+				return false
+			ensure
+				socket.close if socket
+			end
 		else
 			return system(@ping_command)
 		end
 	end
-	
+
 	def safe_fork(double_fork)
 		pid = fork
 		if pid.nil?
