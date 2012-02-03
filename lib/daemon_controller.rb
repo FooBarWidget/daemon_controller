@@ -94,10 +94,10 @@ class DaemonController
 	#  The value may also be a Proc, which returns an expression that evaluates to
 	#  true (indicating that the daemon can be connected to) or false (failure).
 	#  If the Proc raises Errno::ECONNREFUSED, Errno::ENETUNREACH, Errno::ETIMEDOUT
-	#  or Errno::ECONNRESET, Errno::EINVAL and Errno::EADDRNOTAVAIL then that also
+	#  Errno::ECONNRESET, Errno::EINVAL or Errno::EADDRNOTAVAIL then that also
 	#  means that the daemon cannot be connected to.
 	#  <b>NOTE:</b> if the ping command returns an object which responds to
-	#  <tt>#close</tt>, then that method will be called on the return value.
+	#  <tt>#close</tt>, then that method will be called on it.
 	#  This makes it possible to specify a ping command such as
 	#  <tt>lambda { TCPSocket.new('localhost', 1234) }</tt>, without having to worry
 	#  about closing it afterwards.
