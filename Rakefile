@@ -2,7 +2,7 @@ verbose true
 
 desc "Run the unit tests"
 task :test do
-	sh "spec -f s -c spec/*_spec.rb"
+	sh "rspec -f s -c spec/*_spec.rb"
 end
 
 task "package:gem" do
