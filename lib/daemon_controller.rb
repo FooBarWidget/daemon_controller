@@ -22,14 +22,11 @@
 require 'tempfile'
 require 'fcntl'
 require 'timeout'
-
-libdir = File.expand_path(File.dirname(__FILE__))
-$LOAD_PATH.unshift(libdir)
-require 'daemon_controller/lock_file'
-
 if Process.respond_to?(:spawn)
 	require 'rbconfig'
 end
+
+require 'daemon_controller/lock_file'
 
 # Main daemon controller object. See the README for an introduction and tutorial.
 class DaemonController
