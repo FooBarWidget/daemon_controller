@@ -321,6 +321,11 @@ end
 
 describe DaemonController do
 	include TestHelper
+
+	after :each do
+		@server.close if @server && !@server.closed?
+		File.unlink('spec/foo.sock') rescue nil
+	end
 	
 	specify "if the ping command is a block that raises Errno::ECONNREFUSED, then that's " <<
 	        "an indication that the daemon cannot be connected to" do
@@ -332,57 +337,41 @@ describe DaemonController do
 	
 	specify "if the ping command is a block that returns an object that responds to #close, " <<
 	        "then the close method will be called on that object" do
-		server = TCPServer.new('localhost', 8278)
-		begin
-			socket = nil
-			new_controller(:ping_command => lambda do
-				socket = TCPSocket.new('localhost', 8278)
-			end)
-			@controller.send(:run_ping_command)
-			socket.should be_closed
-		ensure
-			server.close
-		end
+		@server = TCPServer.new('localhost', 8278)
+		socket = nil
+		new_controller(:ping_command => lambda do
+			socket = TCPSocket.new('localhost', 8278)
+		end)
+		@controller.send(:run_ping_command)
+		socket.should be_closed
 	end
 	
 	specify "if the ping command is a block that returns an object that responds to #close, " <<
 	        "and #close raises an exception, then that exception is ignored" do
-		server = TCPServer.new('localhost', 8278)
-		begin
-			o = Object.new
-			o.should_receive(:close).and_return do
-				raise StandardError, "foo"
-			end
-			new_controller(:ping_command => lambda do
-				o
-			end)
-			lambda { @controller.send(:run_ping_command) }.should_not raise_error(StandardError)
-		ensure
-			server.close
+		@server = TCPServer.new('localhost', 8278)
+		o = Object.new
+		o.should_receive(:close).and_return do
+			raise StandardError, "foo"
 		end
+		new_controller(:ping_command => lambda do
+			o
+		end)
+		lambda { @controller.send(:run_ping_command) }.should_not raise_error(StandardError)
 	end
 
 	specify "the ping command may be [:tcp, hostname, port]" do
 		new_controller(:ping_command => [:tcp, "localhost", 8278])
 		@controller.send(:run_ping_command).should be_false
 
-		server = TCPServer.new('localhost', 8278)
-		begin
-			@controller.send(:run_ping_command).should be_true
-		ensure
-			server.close
-		end
+		@server = TCPServer.new('localhost', 8278)
+		@controller.send(:run_ping_command).should be_true
 	end
 
 	specify "the ping command may be [:unix, filename]" do
 		new_controller(:ping_command => [:unix, "spec/foo.sock"])
 		@controller.send(:run_ping_command).should be_false
 
-		server = UNIXServer.new('spec/foo.sock')
-		begin
-			@controller.send(:run_ping_command).should be_true
-		ensure
-			server.close
-		end
+		@server = UNIXServer.new('spec/foo.sock')
+		@controller.send(:run_ping_command).should be_true
 	end
 end
