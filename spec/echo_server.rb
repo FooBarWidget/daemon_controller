@@ -61,6 +61,10 @@ if options[:pid_file]
 	end
 end
 
+if ENV['ENV_FILE']
+	options[:env_file] = File.expand_path(ENV['ENV_FILE'])
+end
+
 def main(options)
 	STDIN.reopen("/dev/null", 'r')
 	STDOUT.reopen(options[:log_file], 'a')
@@ -69,6 +73,15 @@ def main(options)
 	STDERR.sync = true
 	Dir.chdir(options[:chdir])
 	File.umask(0)
+
+	if options[:env_file]
+		File.open(options[:env_file], 'w') do |f|
+			f.write("\0")
+		end
+		at_exit do
+			File.unlink(options[:env_file]) rescue nil
+		end
+	end
 	
 	if options[:pid_file]
 		sleep(options[:wait1])

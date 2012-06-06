@@ -234,6 +234,14 @@ describe DaemonController, "#start" do
 			@controller.stop
 		end
 	end
+
+	it "receives environment variables" do
+		new_controller(:env => {'ENV_FILE' => 'spec/env_file.tmp'})
+		File.unlink('spec/env_file.tmp') if File.exist?('spec/env_file.tmp')
+		@controller.start
+		File.exist?('spec/env_file.tmp').should be_true
+		@controller.stop
+	end
 end
 
 describe DaemonController, "#stop" do
