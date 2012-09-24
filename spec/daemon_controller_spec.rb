@@ -291,6 +291,36 @@ describe DaemonController, "#stop" do
 	end
 end
 
+describe DaemonController, "#restart" do
+	include TestHelper
+	
+	before :each do
+		new_controller
+	end
+	
+	it "raises no exception if the daemon is not running" do
+		@controller.restart
+	end
+	
+	describe 'with no restart command' do
+		it "restart the daemon using stop and start" do
+			@controller.should_receive(:stop)
+			@controller.should_receive(:start)
+			@controller.restart
+		end
+	end
+	
+	describe 'with a restart_command' do
+		it 'restarts the daemon using the restart_command' do
+			stop_cmd = "echo 'hello world'"
+			new_controller :restart_command => stop_cmd
+			
+			@controller.should_receive(:run_command).with(stop_cmd)
+			@controller.restart
+		end
+	end
+end
+
 describe DaemonController, "#connect" do
 	include TestHelper
 	
