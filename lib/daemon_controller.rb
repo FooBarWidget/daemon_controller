@@ -120,6 +120,13 @@ class DaemonController
 	#  
 	#  The default value is +nil+.
 	#
+	# [:restart_command]
+	#  A command to restart the daemon with, e.g. "/etc/rc.d/nginx restart". If
+	#  no restart command is given (i.e. +nil+), then DaemonController will
+	#  restart the daemon by calling #stop and #start.
+	#
+	#  The default value is +nil+.
+	#
 	# [:before_start]
 	#  This may be a Proc. It will be called just before running the start command.
 	#  The before_start proc is not subject to the start timeout.
@@ -180,6 +187,7 @@ class DaemonController
 		@start_command = options[:start_command]
 		@stop_command = options[:stop_command]
 		@ping_command = options[:ping_command]
+		@restart_command = options[:restart_command]
 		@ping_interval = options[:ping_interval] || 0.1
 		@pid_file = options[:pid_file]
 		@log_file = options[:log_file]
@@ -283,6 +291,17 @@ class DaemonController
 			rescue Timeout::Error
 				raise StopTimeout, "Daemon '#{@identifier}' did not exit in time"
 			end
+		end
+	end
+	
+	# Restarts the daemon. Uses the restart_command if provided, otherwise
+	# calls #stop and #start.
+	def restart
+		if @restart_command
+			run_command(@restart_command)
+		else
+			stop
+			start
 		end
 	end
 	
