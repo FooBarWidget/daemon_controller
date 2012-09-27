@@ -177,6 +177,10 @@ class DaemonController
 	#  descriptors except stdin, stdout and stderr. However if there are any file
 	#  descriptors you want to keep open, specify the IO objects here. This must be
 	#  an array of IO objects.
+	#
+	# [:env]
+	#  This must be a Hash.  The hash will contain the environment variables available
+	#  to be made available to the daemon. Hash keys must be strings, not symbols.
 	def initialize(options)
 		[:identifier, :start_command, :ping_command, :pid_file, :log_file].each do |option|
 			if !options.has_key?(option)
@@ -198,6 +202,7 @@ class DaemonController
 		@daemonize_for_me = options[:daemonize_for_me]
 		@keep_ios = options[:keep_ios] || []
 		@lock_file = determine_lock_file(options, @identifier, @pid_file)
+		@env = options[:env] || {}
 	end
 	
 	# Start the daemon and wait until it can be pinged.
@@ -598,10 +603,10 @@ private
 						Config::CONFIG['bindir'],
 						Config::CONFIG['RUBY_INSTALL_NAME']
 					) + Config::CONFIG['EXEEXT']
-					pid = Process.spawn(ruby_interpreter, SPAWNER_FILE,
+					pid = Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
 						command, options)
 				else
-					pid = Process.spawn(command, options)
+					pid = Process.spawn(@env, command, options)
 				end
 			else
 				pid = safe_fork(@daemonize_for_me) do
@@ -613,6 +618,7 @@ private
 					STDIN.reopen("/dev/null", "r")
 					STDOUT.reopen(tempfile_path, "w")
 					STDERR.reopen(tempfile_path, "w")
+					ENV.update(@env)
 					exec(command)
 				end
 			end
