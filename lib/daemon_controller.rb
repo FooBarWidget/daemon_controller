@@ -610,10 +610,6 @@ private
 					options[io] = io
 				end
 				if @daemonize_for_me
-					ruby_interpreter = File.join(
-						Config::CONFIG['bindir'],
-						Config::CONFIG['RUBY_INSTALL_NAME']
-					) + Config::CONFIG['EXEEXT']
 					pid = Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
 						command, options)
 				else
@@ -675,8 +671,14 @@ private
 				raise StartError, File.read(tempfile_path).strip
 			end
 		else
+			if @env && !@env.empty?
+				raise "Setting the :env option is not supported on this Ruby implementation."
+			elsif @daemonize_for_me
+				raise "Setting the :daemonize_for_me option is not supported on this Ruby implementation."
+			end
+
 			cmd = "#{command} >\"#{tempfile_path}\""
-			cmd += " 2>\"#{tempfile_path}\"" unless PLATFORM =~ /mswin/
+			cmd << " 2>\"#{tempfile_path}\"" unless PLATFORM =~ /mswin/
 			if !system(cmd)
 				raise StartError, File.read(tempfile_path).strip
 			end
@@ -787,6 +789,13 @@ private
 				socket.close if socket
 			end
 		end
+	end
+
+	def ruby_interpreter
+		File.join(
+			Config::CONFIG['bindir'],
+			Config::CONFIG['RUBY_INSTALL_NAME']
+		) + Config::CONFIG['EXEEXT']
 	end
 
 	def safe_fork(double_fork)

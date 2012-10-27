@@ -19,6 +19,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-# Used on Ruby 1.9 because forking may not be safe/supported on all platforms.
+# This helper script is used for daemonizing a command by executing it and
+# then exiting ourselves. Used on Ruby 1.9 and JRuby because forking may not
+# be safe/supported on all platforms.
 Process.setsid
 Process.spawn(ARGV[0])
