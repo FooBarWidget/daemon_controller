@@ -128,7 +128,7 @@ describe DaemonController, "#start" do
 		end
 	end
 	
-	if DaemonController.send(:fork_supported?) || Process.respond_to?(:spawn)
+	if DaemonController.send(:fork_supported?) || DaemonController.send(:spawn_supported?)
 		it "kills the daemon if it doesn't start in time and hasn't forked " <<
 		   "yet, on platforms where Ruby supports fork() or Process.spawn" do
 			begin
@@ -209,7 +209,7 @@ describe DaemonController, "#start" do
 		log.should == ["before_start", "start_command"]
 	end
 	
-	if DaemonController.send(:fork_supported?) || Process.respond_to?(:spawn)
+	if DaemonController.send(:fork_supported?) || DaemonController.send(:spawn_supported?)
 		it "keeps the file descriptors in 'keep_ios' open" do
 			a, b = IO.pipe
 			begin
@@ -398,18 +398,27 @@ describe DaemonController do
 	end
 
 	specify "the ping command may be [:tcp, hostname, port]" do
-		new_controller(:ping_command => [:tcp, "localhost", 8278])
+		new_controller(:ping_command => [:tcp, "127.0.0.1", 8278])
 		@controller.send(:run_ping_command).should be_false
 
-		@server = TCPServer.new('localhost', 8278)
+		@server = TCPServer.new('127.0.0.1', 8278)
 		@controller.send(:run_ping_command).should be_true
 	end
 
-	specify "the ping command may be [:unix, filename]" do
-		new_controller(:ping_command => [:unix, "spec/foo.sock"])
-		@controller.send(:run_ping_command).should be_false
+	if DaemonController.can_ping_unix_sockets?
+		specify "the ping command may be [:unix, filename]" do
+			new_controller(:ping_command => [:unix, "spec/foo.sock"])
+			@controller.send(:run_ping_command).should be_false
 
-		@server = UNIXServer.new('spec/foo.sock')
-		@controller.send(:run_ping_command).should be_true
+			@server = UNIXServer.new('spec/foo.sock')
+			@controller.send(:run_ping_command).should be_true
+		end
+	else
+		specify "a ping command of type [:unix, filename] is not supported on this Ruby implementation" do
+			new_controller(:ping_command => [:unix, "spec/foo.sock"])
+			@server = UNIXServer.new('spec/foo.sock')
+			lambda { @controller.send(:run_ping_command) }.should raise_error(
+				"Pinging Unix domain sockets is not supported on this Ruby implementation")
+		end
 	end
 end

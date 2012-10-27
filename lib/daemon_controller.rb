@@ -336,6 +336,12 @@ class DaemonController
 		end
 	end
 
+	# Checks whether ping Unix domain sockets is supported. Currently
+	# this is supported on all Ruby implementations, except JRuby.
+	def self.can_ping_unix_sockets?
+		return RUBY_PLATFORM != "java"
+	end
+
 private
 	def start_without_locking
 		if daemon_is_running?
@@ -579,6 +585,11 @@ private
 	def self.fork_supported?
 		return RUBY_PLATFORM != "java" && RUBY_PLATFORM !~ /win32/
 	end
+
+	def self.spawn_supported?
+		# Process.spawn doesn't work very well in JRuby.
+		return Process.respond_to?(:spawn) && RUBY_PLATFORM != "java"
+	end
 	
 	def run_command(command)
 		# Create tempfile for storing the command's output.
@@ -587,7 +598,7 @@ private
 		File.chmod(0666, tempfile_path)
 		tempfile.close
 		
-		if self.class.fork_supported? || Process.respond_to?(:spawn)
+		if self.class.fork_supported? || self.class.spawn_supported?
 			if Process.respond_to?(:spawn)
 				options = {
 					:in  => "/dev/null",
@@ -687,19 +698,74 @@ private
 			end
 		elsif @ping_command.is_a?(Array)
 			type, *args = @ping_command
-			
-			case type
-			when :tcp
-				socket_domain = Socket::Constants::AF_INET
-				hostname, port = args
-				sockaddr = Socket.pack_sockaddr_in(port, hostname)
-			when :unix
-				socket_domain = Socket::Constants::AF_LOCAL
-				sockaddr = Socket.pack_sockaddr_un(args[0])
+			if self.class.can_ping_unix_sockets?
+				case type
+				when :tcp
+					socket_domain = Socket::Constants::AF_INET
+					hostname, port = args
+					sockaddr = Socket.pack_sockaddr_in(port, hostname)
+				when :unix
+					socket_domain = Socket::Constants::AF_LOCAL
+					sockaddr = Socket.pack_sockaddr_un(args[0])
+				else
+					raise ArgumentError, "Unknown ping command type #{type.inspect}"
+				end
+				return ping_socket(socket_domain, sockaddr)
 			else
-				raise ArgumentError, "Unknown ping command type #{type.inspect}"
+				case type
+				when :tcp
+					hostname, port = args
+					return ping_socket(hostname, port)
+				when :unix
+					raise "Pinging Unix domain sockets is not supported on this Ruby implementation"
+				else
+					raise ArgumentError, "Unknown ping command type #{type.inspect}"
+				end
 			end
+		else
+			return system(@ping_command)
+		end
+	end
 
+	if !can_ping_unix_sockets?
+		require 'java'
+		
+		def ping_socket(host_name, port)
+			channel = java.nio.channels.SocketChannel.open
+			begin
+				address = java.net.InetSocketAddress.new(host_name, port)
+				channel.configure_blocking(false)
+				if channel.connect(address)
+					return true
+				end
+
+				deadline = Time.now.to_f + 0.1
+				done = false
+				while true
+					begin
+						if channel.finish_connect
+							return true
+						end
+					rescue java.net.ConnectException => e
+						if e.message =~ /Connection refused/i
+							return false
+						else
+							throw e
+						end
+					end
+					
+					# Not done connecting and no error.
+					sleep 0.01
+					if Time.now.to_f >= deadline
+						return false
+					end
+				end
+			ensure
+				channel.close
+			end
+		end
+	else
+		def ping_socket(socket_domain, sockaddr)
 			begin
 				socket = Socket.new(socket_domain, Socket::Constants::SOCK_STREAM, 0)
 				begin
@@ -720,8 +786,6 @@ private
 			ensure
 				socket.close if socket
 			end
-		else
-			return system(@ping_command)
 		end
 	end
 

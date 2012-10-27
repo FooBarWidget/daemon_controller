@@ -1,5 +1,8 @@
-#!/usr/bin/env ruby
+#!/usr/bin/ruby
 # A simple echo server, used by the unit test.
+# The hashbang is explicitly set to /usr/bin/ruby because we need
+# a Ruby implementation that starts fast and supports forking. The
+# Ruby in $PATH may be JRuby which is neither.
 require 'socket'
 require 'optparse'
 

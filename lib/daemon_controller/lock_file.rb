@@ -78,7 +78,7 @@ class LockFile
 	# The lock file *must* be writable, otherwise an Errno::EACCESS
 	# exception will be raised.
 	def shared_lock
-		File.open(@filename, 'w') do |f|
+		File.open(@filename, 'w+') do |f|
 			if Fcntl.const_defined? :F_SETFD
 				f.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC)
 			end
@@ -93,7 +93,7 @@ class LockFile
 	#
 	# If a lock can be obtained, then the given block will be yielded.
 	def try_shared_lock
-		File.open(@filename, 'w') do |f|
+		File.open(@filename, 'w+') do |f|
 			if Fcntl.const_defined? :F_SETFD
 				f.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC)
 			end
