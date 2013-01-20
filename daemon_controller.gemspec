@@ -1,8 +1,8 @@
 Gem::Specification.new do |s|
   s.name = "daemon_controller"
   # Don't forget to update version.rb too.
-  s.version = "1.1.0"
-  s.date = "2012-10-27"
+  s.version = "1.1.1"
+  s.date = "2013-01-20"
   s.summary = "A library for implementing daemon management capabilities"
   s.email = "hongli@phusion.nl"
   s.homepage = "https://github.com/FooBarWidget/daemon_controller"
