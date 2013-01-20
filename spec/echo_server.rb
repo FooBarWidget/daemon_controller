@@ -86,7 +86,7 @@ def main(options)
 	if options[:pid_file]
 		sleep(options[:wait1])
 		File.open(options[:pid_file], 'w') do |f|
-			f.write(Process.pid)
+			f.puts(Process.pid)
 		end
 		at_exit do
 			File.unlink(options[:pid_file]) rescue nil
