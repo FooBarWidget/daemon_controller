@@ -2,9 +2,24 @@ root = File.expand_path(File.join(File.dirname(__FILE__), ".."))
 $LOAD_PATH.unshift(File.join(root, "lib"))
 Dir.chdir(root)
 
+if !ENV['MRI_RUBY']
+	if RUBY_PLATFORM =~ /java/
+		# We need a Ruby implementation that starts fast and supports forking.
+		# JRuby is neither.
+		abort "In order to run these tests in JRuby, you must set " +
+			"the environment variable $MRI_RUBY to an MRI Ruby interpeter."
+	else
+		require 'rbconfig'
+		rb_config = defined?(RbConfig) ? RbConfig::CONFIG : Config::CONFIG
+		ENV['MRI_RUBY'] = rb_config['bindir'] + '/' + rb_config['RUBY_INSTALL_NAME'] +
+			rb_config['EXEEXT']
+		puts ENV['MRI_RUBY']
+	end
+end
+
 module TestHelper
 	def new_controller(options = {})
-		@start_command = './spec/echo_server.rb -l spec/echo_server.log -P spec/echo_server.pid'
+		@start_command = './spec/run_echo_server -l spec/echo_server.log -P spec/echo_server.pid'
 		if options[:wait1]
 			@start_command << " --wait1 #{options[:wait1]}"
 		end
