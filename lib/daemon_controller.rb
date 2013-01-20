@@ -798,10 +798,15 @@ private
 	end
 
 	def ruby_interpreter
+		if defined?(RbConfig)
+			rb_config = RbConfig::CONFIG
+		else
+			rb_config = Config::CONFIG
+		end
 		File.join(
-			Config::CONFIG['bindir'],
-			Config::CONFIG['RUBY_INSTALL_NAME']
-		) + Config::CONFIG['EXEEXT']
+			rb_config['bindir'],
+			rb_config['RUBY_INSTALL_NAME']
+		) + rb_config['EXEEXT']
 	end
 
 	def safe_fork(double_fork)
