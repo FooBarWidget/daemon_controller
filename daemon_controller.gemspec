@@ -19,6 +19,7 @@ Gem::Specification.new do |s|
       "spec/test_helper.rb",
       "spec/daemon_controller_spec.rb",
       "spec/echo_server.rb",
-      "spec/unresponsive_daemon.rb"
+      "spec/unresponsive_daemon.rb",
+      "spec/run_echo_server"
   ]
 end
