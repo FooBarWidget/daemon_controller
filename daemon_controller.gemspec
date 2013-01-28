@@ -22,4 +22,5 @@ Gem::Specification.new do |s|
       "spec/unresponsive_daemon.rb",
       "spec/run_echo_server"
   ]
+  s.license = "MIT"
 end
