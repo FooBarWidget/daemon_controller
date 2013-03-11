@@ -1,10 +1,12 @@
+$LOAD_PATH.unshift(File.expand_path(File.dirname(__FILE__) + "/lib"))
+require 'daemon_controller/version'
+
 Gem::Specification.new do |s|
   s.name = "daemon_controller"
-  # Don't forget to update version.rb too.
-  s.version = "1.1.1"
-  s.date = "2013-01-20"
+  s.version = DaemonController::VERSION_STRING
+  s.date = "2013-03-11"
   s.summary = "A library for implementing daemon management capabilities"
-  s.email = "hongli@phusion.nl"
+  s.email = "software-signing@phusion.nl"
   s.homepage = "https://github.com/FooBarWidget/daemon_controller"
   s.description = "A library for robust daemon management."
   s.has_rdoc = true
