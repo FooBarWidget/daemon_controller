@@ -29,6 +29,10 @@ It provides the following functionality:
 
     gem install daemon_controller
 
+This gem is signed using PGP with the [Phusion Software Signing key](http://www.phusion.nl/about/gpg). That key in turn is signed by [the rubygems-openpgp Certificate Authority](http://www.rubygems-openpgp-ca.org/).
+
+You can verify the authenticity of the gem by following [The Complete Guide to Verifying Gems with rubygems-openpgp](http://www.rubygems-openpgp-ca.org/blog/the-complete-guide-to-verifying-gems-with-rubygems-openpgp.html).
+
 ## Resources
 
 *   [Website](https://github.com/FooBarWidget/daemon_controller)
