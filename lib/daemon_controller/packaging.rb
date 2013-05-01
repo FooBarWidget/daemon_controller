@@ -1,5 +1,5 @@
 # daemon_controller, library for robust daemon management
-# Copyright (c) 2010-2013 Phusion
+# Copyright (c) 2013 Phusion
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -19,9 +19,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-class DaemonController
-	MAJOR = 1
-	MINOR = 1
-	TINY  = 3
-	VERSION_STRING = "#{MAJOR}.#{MINOR}.#{TINY}"
-end # class DaemonController
+DAEMON_CONTROLLER_FILES = [
+	"README.markdown", "LICENSE.txt", "daemon_controller.gemspec",
+	"lib/**/*.rb",
+	"debian.template/**/*",
+	"spec/*.rb",
+	"spec/run_echo_server"
+]
+
+DAEMON_CONTROLLER_DEBIAN_EXCLUDE_FILES = []

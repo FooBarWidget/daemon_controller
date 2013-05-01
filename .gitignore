@@ -1,3 +1,4 @@
+.DS_Store
 *.gem
 spec/echo_server.log
 spec/echo_server.pid

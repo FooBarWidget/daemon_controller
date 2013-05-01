@@ -1,0 +1,5 @@
+daemon-controller-ruby (1.1.2-1) precise; urgency=low
+
+  * Initial packaging
+
+ -- Hongli Lai <hongli@phusion.nl>  Wed, 01 May 2013 16:04:07 +0200
