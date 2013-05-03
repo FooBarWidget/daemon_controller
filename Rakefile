@@ -50,7 +50,7 @@ end
 ##### Debian packaging support #####
 
 PKG_DIR         = string_option('PKG_DIR', "pkg")
-DEBIAN_NAME     = "daemon-controller-ruby"
+DEBIAN_NAME     = "ruby-daemon-controller"
 ALL_DISTRIBUTIONS  = ["raring", "precise", "lucid"]
 ORIG_TARBALL_FILES = lambda do
 	require 'daemon_controller/packaging'
