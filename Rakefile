@@ -415,7 +415,7 @@ task 'debian:production' => 'debian:orig_tarball' do
 		sh "cd #{PKG_DIR}/#{distribution} && dpkg-checkbuilddeps"
 	end
 	ALL_DISTRIBUTIONS.each do |distribution|
-		sh "cd #{PKG_DIR}/#{distribution} && debuild -S -k#{PACKAGE_SIGNING_KEY}"
+		sh "cd #{PKG_DIR}/#{distribution} && debuild -S -sa -k#{PACKAGE_SIGNING_KEY}"
 	end
 end
 
