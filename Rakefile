@@ -376,7 +376,7 @@ def create_debian_package_dir(distribution)
 end
 
 task 'debian:orig_tarball' do
-	if File.exist?("#{PKG_DIR}/#{DEBIAN_NAME}.orig.tar.gz")
+	if File.exist?("#{PKG_DIR}/#{DEBIAN_NAME}_#{PACKAGE_VERSION}.orig.tar.gz")
 		puts "Debian orig tarball #{PKG_DIR}/#{DEBIAN_NAME}_#{PACKAGE_VERSION}.orig.tar.gz already exists."
 	else
 		sh "rm -rf #{PKG_DIR}/#{DEBIAN_NAME}_#{PACKAGE_VERSION}"
