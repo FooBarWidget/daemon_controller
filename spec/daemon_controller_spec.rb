@@ -394,7 +394,7 @@ describe DaemonController do
 		new_controller(:ping_command => lambda do
 			o
 		end)
-		lambda { @controller.send(:run_ping_command) }.should_not raise_error(StandardError)
+		lambda { @controller.send(:run_ping_command) }.should_not raise_error
 	end
 
 	specify "the ping command may be [:tcp, hostname, port]" do
