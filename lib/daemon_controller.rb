@@ -21,6 +21,7 @@
 
 require 'tempfile'
 require 'fcntl'
+require 'socket'
 require 'timeout'
 if Process.respond_to?(:spawn)
 	require 'rbconfig'
