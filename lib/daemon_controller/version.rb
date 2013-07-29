@@ -22,6 +22,6 @@
 class DaemonController
 	MAJOR = 1
 	MINOR = 1
-	TINY  = 4
+	TINY  = 5
 	VERSION_STRING = "#{MAJOR}.#{MINOR}.#{TINY}"
 end # class DaemonController
