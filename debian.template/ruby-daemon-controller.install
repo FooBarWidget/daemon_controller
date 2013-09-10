@@ -1,0 +1,2 @@
+lib/*.rb usr/lib/ruby/vendor_ruby/
+lib/daemon_controller/*.rb usr/lib/ruby/vendor_ruby/daemon_controller/
