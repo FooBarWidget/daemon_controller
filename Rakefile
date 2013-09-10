@@ -51,7 +51,7 @@ end
 
 PKG_DIR         = string_option('PKG_DIR', "pkg")
 DEBIAN_NAME     = "ruby-daemon-controller"
-ALL_DISTRIBUTIONS  = ["raring", "precise", "lucid"]
+ALL_DISTRIBUTIONS  = string_option('DEBIAN_DISTROS', 'raring precise lucid').split(/[ ,]/)
 ORIG_TARBALL_FILES = lambda do
 	require 'daemon_controller/packaging'
 	Dir[*DAEMON_CONTROLLER_FILES] - Dir[*DAEMON_CONTROLLER_DEBIAN_EXCLUDE_FILES]
@@ -87,6 +87,7 @@ end
 #  * Text inside #if/#elif/#else are automatically unindented.
 class Preprocessor
 	def initialize
+		require 'erb' if !defined?(ERB)
 		@indentation_size = 4
 		@debug = boolean_option('DEBUG')
 	end
@@ -100,10 +101,11 @@ class Preprocessor
 		end
 		the_binding  = create_binding(variables)
 		context      = []
+		@filename    = filename
 		@lineno      = 1
 		@indentation = 0
 
-		each_line(filename) do |line|
+		each_line(filename, the_binding) do |line|
 			debug("context=#{context.inspect}, line=#{line.inspect}")
 
 			name, args_string, cmd_indentation = recognize_command(line)
@@ -174,6 +176,8 @@ class Preprocessor
 				else
 					terminate "#endif is not allowed outside #if block"
 				end
+			when "DEBHELPER"
+				output.puts(line)
 			when "", nil
 				# Either a comment or not a preprocessor command.
 				case context.last
@@ -210,12 +214,18 @@ private
 		"raring"   => "13.04",
 		"saucy"    => "13.10"
 	}
+	DEBIAN_DISTRIBUTIONS = {
+		"squeeze"  => "20110206",
+		"wheezy"   => "20130504"
+	}
 
 	# Provides the DSL that's accessible within.
 	class Evaluator
 		def _infer_distro_table(name)
 			if UBUNTU_DISTRIBUTIONS.has_key?(name)
 				return UBUNTU_DISTRIBUTIONS
+			elsif DEBIAN_DISTRIBUTIONS.has_key?(name)
+				return DEBIAN_DISTRIBUTIONS
 			end
 		end
 
@@ -234,6 +244,7 @@ private
 				table2 = _infer_distro_table(name)
 				raise "Distribution name #{@distribution.inspect} not recognized" if !table1
 				raise "Distribution name #{name.inspect} not recognized" if !table2
+				return false if table1 != table2
 				v1 = table1[@distribution]
 				v2 = table2[name]
 				
@@ -257,16 +268,14 @@ private
 		end
 	end
 
-	def each_line(filename)
-		File.open(filename, 'r') do |f|
-			while true
-				begin
-					line = f.readline.chomp
-				rescue EOFError
-					break
-				end
-				yield line
-			end
+	def each_line(filename, the_binding)
+		data = File.open(filename, 'r') do |f|
+			erb = ERB.new(f.read, nil, "-")
+			erb.filename = filename
+			erb.result(the_binding)
+		end
+		data.each_line do |line|
+			yield line.chomp
 		end
 	end
 	
@@ -274,7 +283,15 @@ private
 		if line =~ /^([\s\t]*)#(.+)/
 			indentation_str = $1
 			command = $2
+
+			# Declare tabs as equivalent to 4 spaces. This is necessary for
+			# Makefiles in which the use of tabs is required.
+			indentation_str.gsub!("\t", "    ")
+
 			name = command.scan(/^\w+/).first
+			# Ignore shebangs and comments.
+			return if name.nil?
+
 			args_string = command.sub(/^#{Regexp.escape(name)}[\s\t]*/, '')
 			return [name, args_string, indentation_str.to_s.size]
 		else
@@ -308,9 +325,24 @@ private
 
 	def unindent(line)
 		line =~ /^([\s\t]*)/
-		found = $1.to_s.size
+		# Declare tabs as equivalent to 4 spaces. This is necessary for
+		# Makefiles in which the use of tabs is required.
+		found = $1.to_s.gsub("\t", "    ").size
+		
 		if found >= @indentation
-			return line[@indentation .. -1]
+			# Tab-friendly way to remove indentation.
+			remaining = @indentation
+			line = line.dup
+			while remaining > 0
+				if line[0..0] == " "
+					remaining -= 1
+				else
+					# This is a tab.
+					remaining -= 4
+				end
+				line.slice!(0, 1)
+			end
+			return line
 		else
 			terminate "wrong indentation: found #{found} characters, should be at least #{@indentation}"
 		end
@@ -321,7 +353,7 @@ private
 	end
 
 	def terminate(message)
-		abort "*** ERROR: line #{@lineno}: #{message}"
+		abort "*** ERROR: #{@filename} line #{@lineno}: #{message}"
 	end
 end
 
@@ -408,8 +440,18 @@ task 'debian:dev' do
 	end
 end
 
-desc "Build Debian source packages to be uploaded to repositories"
-task 'debian:production' => 'debian:orig_tarball' do
+desc "Build Debian source packages"
+task 'debian:source_packages' => 'debian:orig_tarball' do
+	ALL_DISTRIBUTIONS.each do |distribution|
+		create_debian_package_dir(distribution)
+	end
+	ALL_DISTRIBUTIONS.each do |distribution|
+		sh "cd #{PKG_DIR}/#{distribution} && debuild -S -us -uc"
+	end
+end
+
+desc "Build Debian source packages to be uploaded to Launchpad"
+task 'debian:launchpad' => 'debian:orig_tarball' do
 	ALL_DISTRIBUTIONS.each do |distribution|
 		create_debian_package_dir(distribution)
 		sh "cd #{PKG_DIR}/#{distribution} && dpkg-checkbuilddeps"
