@@ -2,4 +2,16 @@
 export DH_VERBOSE=1
 
 %:
-	dh $@ --buildsystem=ruby
+	dh $@
+
+override_dh_auto_configure:
+	# Do nothing
+
+override_dh_auto_build:
+	# Do nothing
+
+override_dh_auto_install:
+	# Do nothing
+
+override_dh_auto_clean:
+	# Do nothing
