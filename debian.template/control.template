@@ -2,7 +2,7 @@ Source: ruby-daemon-controller
 Section: ruby
 Priority: extra
 Maintainer: Hongli Lai <hongli@phusion.nl>
-Build-Depends: debhelper (>= 7.0.50~), gem2deb (>= 0.2.0~)
+Build-Depends: debhelper (>= 7.0.50~)
 Standards-Version: 3.9.3
 Homepage: https://github.com/FooBarWidget/daemon_controller
 Vcs-Git: git://github.com/FooBarWidget/daemon_controller.git
