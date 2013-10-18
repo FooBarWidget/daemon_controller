@@ -571,7 +571,8 @@ private
 		else
 			return nil
 		end
-	rescue Errno::ENOENT
+	rescue Errno::ENOENT, Errno::ESPIPE
+		# ESPIPE means the log file is a pipe.
 		return nil
 	end
 	
