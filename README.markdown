@@ -65,7 +65,7 @@ Enable our YUM repository:
 
 Install our package:
 
-    sudo yum install rubygem-daemon-controller
+    sudo yum install rubygem-daemon_controller
 
 ## Resources
 

@@ -490,7 +490,7 @@ end
 
 ##### RPM packaging support #####
 
-RPM_NAME = "rubygem-daemon-controller"
+RPM_NAME = "rubygem-daemon_controller"
 RPMBUILD_ROOT = File.expand_path("~/rpmbuild")
 MOCK_OFFLINE = boolean_option('MOCK_OFFLINE', false)
 ALL_RPM_DISTROS = {
