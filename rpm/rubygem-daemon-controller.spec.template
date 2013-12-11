@@ -1,0 +1,102 @@
+%global gem_name     daemon_controller
+%global gem_version  <%= PACKAGE_VERSION %>
+
+%if 0%{?fc18}
+%global rubyabi 1.9.1
+%endif
+
+%if 0%{?el6}
+%global rubyabi 1.8
+%endif
+
+Name:     rubygem-%{gem_name}
+Version:  %{gem_version}
+Release:  1<%= @distribution %>
+Summary:  Library for robust daemon management
+License:  MIT
+Group:    Development/Libraries
+URL:      https://github.com/FooBarWidget/daemon_controller
+Source0:  https://rubygems.org/gems/%{gem_name}-%{gem_version}.gem
+
+%if 0%{?fedora} >= 19
+Requires: ruby(release)
+%else
+Requires: ruby(abi) = %{rubyabi}
+%endif
+Requires: ruby(rubygems)
+
+%if 0%{?fedora} >= 19
+BuildRequires: ruby(release)
+%else
+BuildRequires: ruby(abi) = %{rubyabi}
+%endif
+%if 0%{?el6}
+BuildRequires: ruby(rubygems)
+%else
+BuildRequires: rubygems-devel
+%endif
+
+BuildArch: noarch
+Provides: rubygem(%{gem_name}) = %{gem_version}-%{release}
+
+# macros for RHEL6 compatibility:
+%{!?gem_dir: %global gem_dir %(ruby -rubygems -e 'puts Gem::dir' 2>/dev/null)}
+%{!?gem_instdir: %global gem_instdir %{gem_dir}/gems/%{gem_name}-%{gem_version}}
+%{!?gem_libdir: %global gem_libdir %{gem_instdir}/lib}
+%{!?gem_cache: %global gem_cache %{gem_dir}/cache/%{gem_name}-%{gem_version}.gem}
+%{!?gem_spec: %global gem_spec %{gem_dir}/specifications/%{gem_name}-%{gem_version}.gemspec}
+%{!?gem_docdir: %global gem_docdir %{gem_dir}/doc/%{gem_name}-%{gem_version}}
+%{!?ruby_sitearch: %global ruby_sitearch %(ruby -rrbconfig -e 'puts RbConfig::CONFIG["sitearchdir"]')}
+
+
+%description
+Library which implements daemon management capabilities.
+
+%prep
+%setup -q -c -T
+
+%build
+%if 0%{?el6}
+mkdir -p .%{gem_dir}
+gem install \
+    --local \
+    --install-dir .%{gem_dir} \
+    --bindir .%{_bindir} \
+    --no-rdoc --no-ri \
+    --force \
+    --backtrace \
+    %{SOURCE0}
+%else
+%gem_install -n %{SOURCE0} --no-rdoc --no-ri
+%endif
+
+%install
+rm -rf %{buildroot}
+mkdir -p %{buildroot}%{gem_dir}
+cp -a .%{_prefix}/* %{buildroot}%{_prefix}/
+
+%check
+pushd %{buildroot}%{gem_instdir}
+ruby -Ilib -rdaemon_controller -e ''
+popd
+
+%clean
+rm -rf %{buildroot}
+
+%files
+%defattr(-,root,root,-)
+%dir %{gem_instdir}
+%doc %{gem_instdir}/LICENSE.txt
+%doc %{gem_instdir}/README.markdown
+%{gem_instdir}/daemon_controller.gemspec
+%{gem_instdir}/spec
+%{gem_libdir}
+%exclude %{gem_instdir}/Rakefile
+%exclude %{gem_instdir}/debian.template
+%exclude %{gem_instdir}/rpm
+%exclude %{gem_cache}
+%{gem_spec}
+
+%changelog
+* Wed Dec 11 2013 Hongli Lai <hongli@phusion.nl> - 1.1.7-1<%= @distribution %>
+- Initial packaging

@@ -51,6 +51,22 @@ Our Ubuntu Lucid packages are compatible with Debian 6.
     sudo apt-get update
     sudo apt-get install ruby-daemon-controller
 
+## Installation on RHEL, CentOS and Amazon Linux
+
+Enable our YUM repository:
+
+    # RHEL 6, CentOS 6
+    curl -L https://oss-binaries.phusionpassenger.com/yumgems/phusion-misc/el.repo | \
+      sudo tee /etc/yum.repos.d/phusion-misc.repo
+    
+    # Amazon Linux
+    curl -L https://oss-binaries.phusionpassenger.com/yumgems/phusion-misc/amazon.repo | \
+      sudo tee /etc/yum.repos.d/phusion-misc.repo
+
+Install our package:
+
+    sudo yum install rubygem-daemon-controller
+
 ## Resources
 
 *   [Website](https://github.com/FooBarWidget/daemon_controller)

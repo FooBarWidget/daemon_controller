@@ -12,4 +12,4 @@ Package: ruby-daemon-controller
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, ruby | ruby-interpreter
 Description: Library for robust daemon management
- Library which implementing daemon management capabilities.
+ Library which implements daemon management capabilities.

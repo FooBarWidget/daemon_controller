@@ -20,11 +20,15 @@
 # THE SOFTWARE.
 
 DAEMON_CONTROLLER_FILES = [
-	"README.markdown", "LICENSE.txt", "daemon_controller.gemspec",
+	"README.markdown", "LICENSE.txt", "Rakefile", "daemon_controller.gemspec",
 	"lib/**/*.rb",
 	"debian.template/**/*",
+	"rpm/**/*",
 	"spec/*.rb",
 	"spec/run_echo_server"
 ]
 
-DAEMON_CONTROLLER_DEBIAN_EXCLUDE_FILES = []
+DAEMON_CONTROLLER_DEBIAN_EXCLUDE_FILES = [
+	"debian.template/**/*",
+	"rpm/**/*"
+]
