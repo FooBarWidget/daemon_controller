@@ -52,7 +52,7 @@ end
 PKG_DIR         = string_option('PKG_DIR', "pkg")
 DEBIAN_NAME     = "ruby-daemon-controller"
 DEBIAN_PACKAGE_REVISION = 1
-ALL_DISTRIBUTIONS  = string_option('DEBIAN_DISTROS', 'raring precise lucid').split(/[ ,]/)
+ALL_DISTRIBUTIONS  = string_option('DEBIAN_DISTROS', 'saucy precise lucid').split(/[ ,]/)
 ORIG_TARBALL_FILES = lambda do
 	require 'daemon_controller/packaging'
 	Dir[*DAEMON_CONTROLLER_FILES] - Dir[*DAEMON_CONTROLLER_DEBIAN_EXCLUDE_FILES]
