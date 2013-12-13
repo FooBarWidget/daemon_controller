@@ -29,6 +29,7 @@ DAEMON_CONTROLLER_FILES = [
 ]
 
 DAEMON_CONTROLLER_DEBIAN_EXCLUDE_FILES = [
+	"Rakefile",
 	"debian.template/**/*",
 	"rpm/**/*"
 ]

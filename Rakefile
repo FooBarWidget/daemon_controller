@@ -51,6 +51,7 @@ end
 
 PKG_DIR         = string_option('PKG_DIR', "pkg")
 DEBIAN_NAME     = "ruby-daemon-controller"
+DEBIAN_PACKAGE_REVISION = 1
 ALL_DISTRIBUTIONS  = string_option('DEBIAN_DISTROS', 'raring precise lucid').split(/[ ,]/)
 ORIG_TARBALL_FILES = lambda do
 	require 'daemon_controller/packaging'
@@ -411,7 +412,7 @@ def create_debian_package_dir(distribution)
 	sh "mv #{root}/debian.template #{root}/debian"
 	changelog = File.read("#{root}/debian/changelog")
 	changelog =
-		"#{DEBIAN_NAME} (#{PACKAGE_VERSION}-1~#{distribution}1) #{distribution}; urgency=low\n" +
+		"#{DEBIAN_NAME} (#{PACKAGE_VERSION}-#{DEBIAN_PACKAGE_REVISION}~#{distribution}1) #{distribution}; urgency=low\n" +
 		"\n" +
 		"  * Package built.\n" +
 		"\n" +
@@ -487,6 +488,7 @@ task 'debian:clean' do
 	end
 	sh "rm -rf #{PKG_DIR}/*.debian.tar.gz"
 end
+
 
 ##### RPM packaging support #####
 
