@@ -1,5 +1,5 @@
 # daemon_controller, library for robust daemon management
-# Copyright (c) 2010-2013 Phusion
+# Copyright (c) 2010-2014 Phusion
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,7 @@
 
 class DaemonController
 	MAJOR = 1
-	MINOR = 1
-	TINY  = 8
+	MINOR = 2
+	TINY  = 0
 	VERSION_STRING = "#{MAJOR}.#{MINOR}.#{TINY}"
 end # class DaemonController

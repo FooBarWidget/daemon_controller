@@ -1,5 +1,5 @@
 # daemon_controller, library for robust daemon management
-# Copyright (c) 2010-2013 Phusion
+# Copyright (c) 2010-2014 Phusion
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -705,16 +705,16 @@ private
 			if self.class.can_ping_unix_sockets?
 				case type
 				when :tcp
-					socket_domain = Socket::Constants::AF_INET
 					hostname, port = args
 					sockaddr = Socket.pack_sockaddr_in(port, hostname)
+					return ping_tcp_socket(sockaddr)
 				when :unix
 					socket_domain = Socket::Constants::AF_LOCAL
 					sockaddr = Socket.pack_sockaddr_un(args[0])
+					return ping_socket(socket_domain, sockaddr)
 				else
 					raise ArgumentError, "Unknown ping command type #{type.inspect}"
 				end
-				return ping_socket(socket_domain, sockaddr)
 			else
 				case type
 				when :tcp
@@ -795,6 +795,14 @@ private
 				return false
 			ensure
 				socket.close if socket
+			end
+		end
+
+		def ping_tcp_socket(sockaddr)
+			begin
+				ping_socket(Socket::Constants::AF_INET, sockaddr)
+			rescue Errno::EAFNOSUPPORT
+				ping_socket(Socket::Constants::AF_INET6, sockaddr)
 			end
 		end
 	end
