@@ -272,11 +272,11 @@ class DaemonController
             raise ConnectError, "Cannot connect to the daemon"
           end
         else
-          return connection
+          connection
         end
       end
     else
-      return connection
+      connection
     end
   end
   
@@ -321,7 +321,7 @@ class DaemonController
   # reading of the PID file.
   def pid
     @lock_file.shared_lock do
-      return read_pid_file
+      read_pid_file
     end
   end
   
@@ -333,14 +333,14 @@ class DaemonController
   # reading of the PID file.
   def running?
     @lock_file.shared_lock do
-      return daemon_is_running?
+      daemon_is_running?
     end
   end
 
   # Checks whether ping Unix domain sockets is supported. Currently
   # this is supported on all Ruby implementations, except JRuby.
   def self.can_ping_unix_sockets?
-    return RUBY_PLATFORM != "java"
+    RUBY_PLATFORM != "java"
   end
 
 private
@@ -407,7 +407,7 @@ private
       raise(StartTimeout, differences_in_log_file ||
         "Daemon '#{@identifier}' failed to start in time.")
     else
-      return true
+      true
     end
   end
   
@@ -459,21 +459,21 @@ private
       pid = nil
     end
     if pid.nil?
-      return false
+      false
     elsif check_pid(pid)
-      return true
+      true
     else
       delete_pid_file
-      return false
+      false
     end
   end
   
   def read_pid_file
     pid = File.read(@pid_file).strip
     if pid =~ /\A\d+\Z/
-      return pid.to_i
+      pid.to_i
     else
-      return nil
+      nil
     end
   end
   
@@ -484,15 +484,15 @@ private
   
   def check_pid(pid)
     Process.kill(0, pid)
-    return true
+    true
   rescue Errno::ESRCH
-    return false
+    false
   rescue Errno::EPERM
     # We didn't have permission to kill the process. Either the process
     # is owned by someone else, or the system has draconian security
     # settings and we aren't allowed to kill *any* process. Assume that
     # the process is running.
-    return true
+    true
   end
   
   def wait_until(sleep_interval = 0.1)
@@ -505,14 +505,14 @@ private
     while !(pid_file_available? || log_file_has_changed?)
       sleep 0.1
     end
-    return pid_file_is_available?
+    pid_file_is_available?
   end
   
   def wait_until_daemon_responds_to_ping_or_has_exited_or_log_file_has_changed
     while !(run_ping_command || !daemon_is_running? || log_file_has_changed?)
       sleep(@ping_interval)
     end
-    return run_ping_command
+    run_ping_command
   end
   
   def record_activity
@@ -521,11 +521,11 @@ private
   
   # Check whether there has been no recorded activity in the past +seconds+ seconds.
   def no_activity?(seconds)
-    return Time.now - @last_activity_time > seconds
+    Time.now - @last_activity_time > seconds
   end
   
   def pid_file_available?
-    return File.exist?(@pid_file) && File.stat(@pid_file).size != 0
+    File.exist?(@pid_file) && File.stat(@pid_file).size != 0
   end
   
   # This method does nothing and only serves as a hook for the unit test.
@@ -548,12 +548,12 @@ private
         result = @current_log_file_stat.mtime != stat.mtime ||
                  @current_log_file_stat.size  != stat.size
         @current_log_file_stat = stat
-        return result
+        result
       else
-        return true
+        true
       end
     else
-      return false
+      false
     end
   end
   
@@ -563,34 +563,34 @@ private
         f.seek(@original_log_file_stat.size, IO::SEEK_SET)
         diff = f.read.strip
         if diff.empty?
-          return nil
+          nil
         else
-          return diff
+          diff
         end
       end
     else
-      return nil
+      nil
     end
   rescue Errno::ENOENT, Errno::ESPIPE
     # ESPIPE means the log file is a pipe.
-    return nil
+    nil
   end
   
   def determine_lock_file(options, identifier, pid_file)
     if options[:lock_file]
-      return LockFile.new(File.expand_path(options[:lock_file]))
+      LockFile.new(File.expand_path(options[:lock_file]))
     else
-      return LockFile.new(File.expand_path(pid_file + ".lock"))
+      LockFile.new(File.expand_path(pid_file + ".lock"))
     end
   end
   
   def self.fork_supported?
-    return RUBY_PLATFORM != "java" && RUBY_PLATFORM !~ /win32/
+    RUBY_PLATFORM != "java" && RUBY_PLATFORM !~ /win32/
   end
 
   def self.spawn_supported?
     # Process.spawn doesn't work very well in JRuby.
-    return Process.respond_to?(:spawn) && RUBY_PLATFORM != "java"
+    Process.respond_to?(:spawn) && RUBY_PLATFORM != "java"
   end
   
   def run_command(command)
@@ -696,9 +696,9 @@ private
         if value.respond_to?(:close)
           value.close rescue nil
         end
-        return value
+        value
       rescue *ALLOWED_CONNECT_EXCEPTIONS
-        return false
+        false
       end
     elsif @ping_command.is_a?(Array)
       type, *args = @ping_command
@@ -707,11 +707,11 @@ private
         when :tcp
           hostname, port = args
           sockaddr = Socket.pack_sockaddr_in(port, hostname)
-          return ping_tcp_socket(sockaddr)
+          ping_tcp_socket(sockaddr)
         when :unix
           socket_domain = Socket::Constants::AF_LOCAL
           sockaddr = Socket.pack_sockaddr_un(args[0])
-          return ping_socket(socket_domain, sockaddr)
+          ping_socket(socket_domain, sockaddr)
         else
           raise ArgumentError, "Unknown ping command type #{type.inspect}"
         end
@@ -719,7 +719,7 @@ private
         case type
         when :tcp
           hostname, port = args
-          return ping_socket(hostname, port)
+          ping_socket(hostname, port)
         when :unix
           raise "Pinging Unix domain sockets is not supported on this Ruby implementation"
         else
@@ -727,7 +727,7 @@ private
         end
       end
     else
-      return system(@ping_command)
+      system(@ping_command)
     end
   end
 
@@ -790,9 +790,9 @@ private
             raise Errno::ECONNREFUSED
           end
         end
-        return true
+        true
       rescue Errno::ECONNREFUSED, Errno::ENOENT
-        return false
+        false
       ensure
         socket.close if socket
       end
@@ -845,9 +845,9 @@ private
     else
       if double_fork
         Process.waitpid(pid) rescue nil
-        return pid
+        pid
       else
-        return pid
+        pid
       end
     end
   end
@@ -867,7 +867,7 @@ private
         result = Process.waitpid(pid, Process::WNOHANG)
         sleep 0.01 if !result
       end
-      return result
+      result
     end
   end
 end
