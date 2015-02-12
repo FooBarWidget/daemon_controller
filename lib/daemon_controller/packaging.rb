@@ -1,5 +1,5 @@
 # daemon_controller, library for robust daemon management
-# Copyright (c) 2013 Phusion
+# Copyright (c) 2013-2015 Phusion
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,16 +20,16 @@
 # THE SOFTWARE.
 
 DAEMON_CONTROLLER_FILES = [
-	"README.markdown", "LICENSE.txt", "Rakefile", "daemon_controller.gemspec",
-	"lib/**/*.rb",
-	"debian.template/**/*",
-	"rpm/**/*",
-	"spec/*.rb",
-	"spec/run_echo_server"
+  "README.markdown", "LICENSE.txt", "Rakefile", "daemon_controller.gemspec",
+  "lib/**/*.rb",
+  "debian.template/**/*",
+  "rpm/**/*",
+  "spec/*.rb",
+  "spec/run_echo_server"
 ]
 
 DAEMON_CONTROLLER_DEBIAN_EXCLUDE_FILES = [
-	"Rakefile",
-	"debian.template/**/*",
-	"rpm/**/*"
+  "Rakefile",
+  "debian.template/**/*",
+  "rpm/**/*"
 ]
