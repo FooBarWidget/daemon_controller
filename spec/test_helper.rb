@@ -17,6 +17,20 @@ if !ENV['MRI_RUBY']
   end
 end
 
+trap("SIGQUIT") do
+  if Thread.respond_to?(:list)
+    output = "----- #{Time.now} -----\n"
+    Thread.list.each do |thread|
+      output << "##### #{thread}\n"
+      output << thread.backtrace.join("\n")
+      output << "\n"
+    end
+    output << "--------------------"
+    STDERR.puts(output)
+    STDERR.flush
+  end
+end
+
 module TestHelper
   def new_controller(options = {})
     @start_command = './spec/run_echo_server -l spec/echo_server.log -P spec/echo_server.pid'
