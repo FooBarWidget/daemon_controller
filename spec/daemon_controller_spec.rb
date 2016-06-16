@@ -72,6 +72,13 @@ describe DaemonController, "#start" do
       thread.join
     end
   end
+
+  it "works when the log file is not a regular file" do
+    new_controller(:log_file => "/dev/stderr")
+    @controller.start
+    expect(ping_echo_server).to be true
+    @controller.stop
+  end
   
   it "raises StartTimeout if the daemon doesn't start in time" do
     if exec_is_slow?
@@ -170,6 +177,18 @@ describe DaemonController, "#start" do
       violated
     rescue DaemonController::StartTimeout => e
       e.message.should =~ /crashing, as instructed/
+    end
+  end
+
+  specify "the daemon's error output is not available if the log file is not a regular file" do
+    new_controller(:crash_before_bind => true,
+      :log_file_activity_timeout => 0.1,
+      :log_file => "/dev/stderr")
+    begin
+      @controller.start
+      violated
+    rescue DaemonController::StartTimeout => e
+      e.message.should == "Daemon 'My Test Daemon' failed to start in time."
     end
   end
   

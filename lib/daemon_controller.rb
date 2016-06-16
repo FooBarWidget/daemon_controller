@@ -1,5 +1,5 @@
 # daemon_controller, library for robust daemon management
-# Copyright (c) 2010-2015 Phusion Holding B.V.
+# Copyright (c) 2010-2016 Phusion Holding B.V.
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -558,7 +558,7 @@ private
   end
   
   def differences_in_log_file
-    if @original_log_file_stat
+    if @original_log_file_stat && @original_log_file_stat.file?
       File.open(@log_file, 'r') do |f|
         f.seek(@original_log_file_stat.size, IO::SEEK_SET)
         diff = f.read.strip
