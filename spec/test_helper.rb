@@ -60,7 +60,7 @@ module TestHelper
     }.merge(options)
     @controller = DaemonController.new(new_options)
   end
-  
+
   def ping_echo_server
     begin
       TCPSocket.new('127.0.0.1', 3230)
@@ -69,17 +69,17 @@ module TestHelper
       false
     end
   end
-  
+
   def write_file(filename, contents)
     File.open(filename, 'w') do |f|
       f.write(contents)
     end
   end
-  
+
   def exec_is_slow?
     return RUBY_PLATFORM == "java"
   end
-  
+
   def process_is_alive?(pid)
     begin
       Process.kill(0, pid)
@@ -90,7 +90,7 @@ module TestHelper
       return true
     end
   end
-  
+
   def eventually(deadline_duration = 1, check_interval = 0.05)
     deadline = Time.now + deadline_duration
     while Time.now < deadline
@@ -120,7 +120,7 @@ class WaitingThread < Thread
       yield
     end
   end
-  
+
   def go!
     @mutex.synchronize do
       @go = true

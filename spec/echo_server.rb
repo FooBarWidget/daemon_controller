@@ -15,7 +15,7 @@ options = {
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: echo_server.rb [options]"
   opts.separator ""
-  
+
   opts.separator "Options:"
   opts.on("-p", "--port PORT", Integer, "Port to use. Default: 3230") do |value|
     options[:port] = value
@@ -82,7 +82,7 @@ def main(options)
       File.unlink(options[:env_file]) rescue nil
     end
   end
-  
+
   if options[:pid_file]
     sleep(options[:wait1])
     File.open(options[:pid_file], 'w') do |f|
@@ -92,13 +92,13 @@ def main(options)
       File.unlink(options[:pid_file]) rescue nil
     end
   end
-  
+
   sleep(options[:wait2])
   if options[:crash_before_bind]
     puts "#{Time.now}: crashing, as instructed."
     exit 2
   end
-  
+
   server = TCPServer.new('127.0.0.1', options[:port])
   begin
     puts "*** #{Time.now}: echo server started"

@@ -1,16 +1,16 @@
 # daemon_controller, library for robust daemon management
 # Copyright (c) 2010-2016 Phusion Holding B.V.
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in
 # all copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -34,10 +34,10 @@ class DaemonController
   ALLOWED_CONNECT_EXCEPTIONS = [Errno::ECONNREFUSED, Errno::ENETUNREACH,
     Errno::ETIMEDOUT, Errno::ECONNRESET, Errno::EINVAL,
     Errno::EADDRNOTAVAIL]
-  
+
   SPAWNER_FILE = File.expand_path(File.join(File.dirname(__FILE__),
     "daemon_controller", "spawn.rb"))
-  
+
   class Error < StandardError
   end
   class TimeoutError < Error
@@ -66,20 +66,20 @@ class DaemonController
   #  This identifier will be used in some error messages. On some platforms, it will
   #  be used for concurrency control: on such platforms, no two DaemonController
   #  objects will operate on the same identifier on the same time.
-  #  
+  #
   # [:start_command]
   #  The command to start the daemon. This must be a a String, e.g.
   #  "mongrel_rails start -e production", or a Proc which returns a String.
-  #  
+  #
   #  If the value is a Proc, and the +before_start+ option is given too, then
   #  the +start_command+ Proc is guaranteed to be called after the +before_start+
   #  Proc is called.
-  #  
+  #
   # [:ping_command]
   #  The ping command is used to check whether the daemon can be connected to.
   #  It is also used to ensure that #start only returns when the daemon can be
   #  connected to.
-  #  
+  #
   #  The value may be a command string. This command must exit with an exit code of
   #  0 if the daemon can be successfully connected to, or exit with a non-0 exit
   #  code on failure.
@@ -88,7 +88,7 @@ class DaemonController
   #  It must be in one of the following forms:
   #  - [:tcp, host_name, port]
   #  - [:unix, filename]
-  #  
+  #
   #  The value may also be a Proc, which returns an expression that evaluates to
   #  true (indicating that the daemon can be connected to) or false (failure).
   #  If the Proc raises Errno::ECONNREFUSED, Errno::ENETUNREACH, Errno::ETIMEDOUT
@@ -100,7 +100,7 @@ class DaemonController
   #  <tt>lambda { TCPSocket.new('localhost', 1234) }</tt>, without having to worry
   #  about closing it afterwards.
   #  Any exceptions raised by #close are ignored.
-  #  
+  #
   # [:pid_file]
   #  The PID file that the daemon will write to. Used to check whether the daemon
   #  is running.
@@ -108,7 +108,7 @@ class DaemonController
   # [:lock_file]
   #  The lock file to use for serializing concurrent daemon management operations.
   #  Defaults to "(filename of PID file).lock".
-  #  
+  #
   # [:log_file]
   #  The log file that the daemon will write to. It will be consulted to see
   #  whether the daemon has printed any error messages during startup.
@@ -118,7 +118,7 @@ class DaemonController
   #  A command to stop the daemon with, e.g. "/etc/rc.d/nginx stop". If no stop
   #  command is given (i.e. +nil+), then DaemonController will stop the daemon
   #  by killing the PID written in the PID file.
-  #  
+  #
   #  The default value is +nil+.
   #
   # [:restart_command]
@@ -131,23 +131,23 @@ class DaemonController
   # [:before_start]
   #  This may be a Proc. It will be called just before running the start command.
   #  The before_start proc is not subject to the start timeout.
-  #  
+  #
   # [:start_timeout]
   #  The maximum amount of time, in seconds, that #start may take to start
   #  the daemon. Since #start also waits until the daemon can be connected to,
   #  that wait time is counted as well. If the daemon does not start in time,
   #  then #start will raise an exception.
-  #  
+  #
   #  The default value is 15.
-  #  
+  #
   # [:stop_timeout]
   #  The maximum amount of time, in seconds, that #stop may take to stop
   #  the daemon. Since #stop also waits until the daemon is no longer running,
   #  that wait time is counted as well. If the daemon does not stop in time,
   #  then #stop will raise an exception.
-  #  
+  #
   #  The default value is 15.
-  #  
+  #
   # [:log_file_activity_timeout]
   #  Once a daemon has gone into the background, it will become difficult to
   #  know for certain whether it is still initializing or whether it has
@@ -155,13 +155,13 @@ class DaemonController
   #  failed with an error after daemonizing but before it has written its PID file;
   #  not many system administrators want to wait 15 seconds (the default start
   #  timeout) to be notified of whether the daemon has terminated with an error.
-  #  
+  #
   #  An alternative way to check whether the daemon has terminated with an error,
   #  is by checking whether its log file has been recently updated. If, after the
   #  daemon has started, the log file hasn't been updated for the amount of seconds
   #  given by the :log_file_activity_timeout option, then the daemon is assumed to
   #  have terminated with an error.
-  #  
+  #
   #  The default value is 7.
   #
   # [:daemonize_for_me]
@@ -170,7 +170,7 @@ class DaemonController
   #  stderr before daemonizing. However, if the daemon doesn't support daemonization
   #  for some reason, then setting this option to true will cause daemon_controller
   #  to do the daemonization for the daemon.
-  #  
+  #
   #  The default is false.
   #
   # [:keep_ios]
@@ -205,7 +205,7 @@ class DaemonController
     @lock_file = determine_lock_file(options, @identifier, @pid_file)
     @env = options[:env] || {}
   end
-  
+
   # Start the daemon and wait until it can be pinged.
   #
   # Raises:
@@ -218,7 +218,7 @@ class DaemonController
       start_without_locking
     end
   end
-  
+
   # Connect to the daemon by running the given block, which contains the
   # connection logic. If the daemon isn't already running, then it will be
   # started.
@@ -279,7 +279,7 @@ class DaemonController
       connection
     end
   end
-  
+
   # Stop the daemon and wait until it has exited.
   #
   # Raises:
@@ -299,7 +299,7 @@ class DaemonController
       end
     end
   end
-  
+
   # Restarts the daemon. Uses the restart_command if provided, otherwise
   # calls #stop and #start.
   def restart
@@ -310,7 +310,7 @@ class DaemonController
       start
     end
   end
-  
+
   # Returns the daemon's PID, as reported by its PID file. Returns the PID
   # as an integer, or nil there is no valid PID in the PID file.
   #
@@ -324,7 +324,7 @@ class DaemonController
       read_pid_file
     end
   end
-  
+
   # Checks whether the daemon is still running. This is done by reading
   # the PID file and then checking whether there is a process with that
   # PID.
@@ -357,7 +357,7 @@ private
         done = false
         spawn_daemon
         record_activity
-        
+
         # We wait until the PID file is available and until
         # the daemon responds to pings, but we wait no longer
         # than @start_timeout seconds in total (including daemon
@@ -410,13 +410,13 @@ private
       true
     end
   end
-  
+
   def before_start
     if @before_start
       @before_start.call
     end
   end
-  
+
   def spawn_daemon
     if @start_command.respond_to?(:call)
       run_command(@start_command.call)
@@ -424,7 +424,7 @@ private
       run_command(@start_command)
     end
   end
-  
+
   def kill_daemon
     if @stop_command
       begin
@@ -436,7 +436,7 @@ private
       kill_daemon_with_signal
     end
   end
-  
+
   def kill_daemon_with_signal(force = false)
     pid = read_pid_file
     if pid
@@ -448,7 +448,7 @@ private
     end
   rescue Errno::ESRCH, Errno::ENOENT
   end
-  
+
   def daemon_is_running?
     begin
       pid = read_pid_file
@@ -467,7 +467,7 @@ private
       false
     end
   end
-  
+
   def read_pid_file
     pid = File.read(@pid_file).strip
     if pid =~ /\A\d+\Z/
@@ -476,12 +476,12 @@ private
       nil
     end
   end
-  
+
   def delete_pid_file
     File.unlink(@pid_file)
   rescue Errno::EPERM, Errno::EACCES, Errno::ENOENT # ignore
   end
-  
+
   def check_pid(pid)
     Process.kill(0, pid)
     true
@@ -494,53 +494,53 @@ private
     # the process is running.
     true
   end
-  
+
   def wait_until(sleep_interval = 0.1)
     while !yield
       sleep(sleep_interval)
     end
   end
-  
+
   def wait_until_pid_file_is_available_or_log_file_has_changed
     while !(pid_file_available? || log_file_has_changed?)
       sleep 0.1
     end
     pid_file_is_available?
   end
-  
+
   def wait_until_daemon_responds_to_ping_or_has_exited_or_log_file_has_changed
     while !(run_ping_command || !daemon_is_running? || log_file_has_changed?)
       sleep(@ping_interval)
     end
     run_ping_command
   end
-  
+
   def record_activity
     @last_activity_time = Time.now
   end
-  
+
   # Check whether there has been no recorded activity in the past +seconds+ seconds.
   def no_activity?(seconds)
     Time.now - @last_activity_time > seconds
   end
-  
+
   def pid_file_available?
     File.exist?(@pid_file) && File.stat(@pid_file).size != 0
   end
-  
+
   # This method does nothing and only serves as a hook for the unit test.
   def start_timed_out
   end
-  
+
   # This method does nothing and only serves as a hook for the unit test.
   def daemonization_timed_out
   end
-  
+
   def save_log_file_information
     @original_log_file_stat = File.stat(@log_file) rescue nil
     @current_log_file_stat = @original_log_file_stat
   end
-  
+
   def log_file_has_changed?
     if @current_log_file_stat
       stat = File.stat(@log_file) rescue nil
@@ -556,7 +556,7 @@ private
       false
     end
   end
-  
+
   def differences_in_log_file
     if @original_log_file_stat && @original_log_file_stat.file?
       File.open(@log_file, 'r') do |f|
@@ -575,7 +575,7 @@ private
     # ESPIPE means the log file is a pipe.
     nil
   end
-  
+
   def determine_lock_file(options, identifier, pid_file)
     if options[:lock_file]
       LockFile.new(File.expand_path(options[:lock_file]))
@@ -583,7 +583,7 @@ private
       LockFile.new(File.expand_path(pid_file + ".lock"))
     end
   end
-  
+
   def self.fork_supported?
     RUBY_PLATFORM != "java" && RUBY_PLATFORM !~ /win32/
   end
@@ -592,14 +592,14 @@ private
     # Process.spawn doesn't work very well in JRuby.
     Process.respond_to?(:spawn) && RUBY_PLATFORM != "java"
   end
-  
+
   def run_command(command)
     # Create tempfile for storing the command's output.
     tempfile = Tempfile.new('daemon-output')
     tempfile_path = tempfile.path
     File.chmod(0666, tempfile_path)
     tempfile.close
-    
+
     if self.class.fork_supported? || self.class.spawn_supported?
       if Process.respond_to?(:spawn)
         options = {
@@ -631,7 +631,7 @@ private
           exec(command)
         end
       end
-      
+
       # run_command might be running in a timeout block (like
       # in #start_without_locking).
       begin
@@ -646,7 +646,7 @@ private
         return
       rescue Timeout::Error
         daemonization_timed_out
-        
+
         # If the daemon doesn't fork into the background
         # in time, then kill it.
         begin
@@ -688,7 +688,7 @@ private
   ensure
     File.unlink(tempfile_path) rescue nil
   end
-  
+
   def run_ping_command
     if @ping_command.respond_to?(:call)
       begin
@@ -733,7 +733,7 @@ private
 
   if !can_ping_unix_sockets?
     require 'java'
-    
+
     def ping_socket(host_name, port)
       channel = java.nio.channels.SocketChannel.open
       begin
@@ -757,7 +757,7 @@ private
               throw e
             end
           end
-          
+
           # Not done connecting and no error.
           sleep 0.01
           if Time.now.to_f >= deadline
@@ -851,7 +851,7 @@ private
       end
     end
   end
-  
+
   if RUBY_VERSION < "1.9"
     def interruptable_waitpid(pid)
       Process.waitpid(pid)
