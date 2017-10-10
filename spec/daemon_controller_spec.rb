@@ -2,6 +2,8 @@ require File.expand_path(File.join(File.dirname(__FILE__), "test_helper"))
 require 'daemon_controller'
 require 'benchmark'
 require 'socket'
+require 'tmpdir'
+require 'shellwords'
 
 describe DaemonController, "#start" do
   before :each do
@@ -263,7 +265,7 @@ describe DaemonController, "#stop" do
   end
 
   after :each do
-    @controller.stop
+    @controller.stop if @controller
   end
 
   it "raises no exception if the daemon is not running" do
@@ -306,6 +308,29 @@ describe DaemonController, "#stop" do
     end
 
     it "makes the stop command's error message available in the exception" do
+    end
+
+    it "calls the stop command if the PID file is invalid and :dont_stop_if_pid_file_empty is not set" do
+      begin
+        Dir.mktmpdir do |tmpdir|
+          File.open('spec/echo_server.pid', 'w').close
+          new_controller(:stop_command => "touch #{Shellwords.escape tmpdir}/stopped")
+          @controller.stop
+          expect(File.exist?("#{tmpdir}/stopped")).to be_truthy
+        end
+      ensure
+        @controller = nil
+      end
+    end
+
+    it "does not call the stop command if the PID file is invalid and :dont_stop_if_pid_file_empty is set" do
+      Dir.mktmpdir do |tmpdir|
+        File.open('spec/echo_server.pid', 'w').close
+        new_controller(:stop_command => "touch #{Shellwords.escape tmpdir}/stopped",
+          :dont_stop_if_pid_file_empty => true)
+        @controller.stop
+        expect(File.exist?("#{tmpdir}/stopped")).to be_falsey
+      end
     end
   end
 end

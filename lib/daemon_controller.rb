@@ -1,5 +1,5 @@
 # daemon_controller, library for robust daemon management
-# Copyright (c) 2010-2016 Phusion Holding B.V.
+# Copyright (c) 2010-2017 Phusion Holding B.V.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -165,6 +165,14 @@ class DaemonController
   #
   #  The default value is 7.
   #
+  # [:dont_stop_if_pid_file_empty]
+  #  If the :stop_command option is given, then normally daemon_controller will
+  #  always execute this command upon calling #stop. But if :dont_stop_if_pid_file_empty
+  #  is given, then daemon_controller will not do that if the PID file does not contain
+  #  a valid number.
+  #
+  #  The default is false.
+  #
   # [:daemonize_for_me]
   #  Normally daemon_controller will wait until the daemon has daemonized into the
   #  background, in order to capture any errors that it may print on stdout or
@@ -201,6 +209,7 @@ class DaemonController
     @start_timeout = options[:start_timeout] || 15
     @stop_timeout = options[:stop_timeout] || 15
     @log_file_activity_timeout = options[:log_file_activity_timeout] || 7
+    @dont_stop_if_pid_file_empty = options[:dont_stop_if_pid_file_empty]
     @daemonize_for_me = options[:daemonize_for_me]
     @keep_ios = options[:keep_ios] || []
     @lock_file = determine_lock_file(options, @identifier, @pid_file)
@@ -428,6 +437,9 @@ private
 
   def kill_daemon
     if @stop_command
+      if @dont_stop_if_pid_file_empty && read_pid_file.nil?
+        return
+      end
       begin
         run_command(@stop_command)
       rescue StartError => e
