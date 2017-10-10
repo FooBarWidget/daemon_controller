@@ -310,7 +310,7 @@ describe DaemonController, "#stop" do
     it "makes the stop command's error message available in the exception" do
     end
 
-    it "calls the stop command if the PID file is invalid and :dont_stop_if_pid_file_empty is not set" do
+    it "calls the stop command if the PID file is invalid and :dont_stop_if_pid_file_invalid is not set" do
       begin
         Dir.mktmpdir do |tmpdir|
           File.open('spec/echo_server.pid', 'w').close
@@ -323,11 +323,11 @@ describe DaemonController, "#stop" do
       end
     end
 
-    it "does not call the stop command if the PID file is invalid and :dont_stop_if_pid_file_empty is set" do
+    it "does not call the stop command if the PID file is invalid and :dont_stop_if_pid_file_invalid is set" do
       Dir.mktmpdir do |tmpdir|
         File.open('spec/echo_server.pid', 'w').close
         new_controller(:stop_command => "touch #{Shellwords.escape tmpdir}/stopped",
-          :dont_stop_if_pid_file_empty => true)
+          :dont_stop_if_pid_file_invalid => true)
         @controller.stop
         expect(File.exist?("#{tmpdir}/stopped")).to be_falsey
       end

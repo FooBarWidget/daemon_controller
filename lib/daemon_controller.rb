@@ -165,9 +165,9 @@ class DaemonController
   #
   #  The default value is 7.
   #
-  # [:dont_stop_if_pid_file_empty]
+  # [:dont_stop_if_pid_file_invalid]
   #  If the :stop_command option is given, then normally daemon_controller will
-  #  always execute this command upon calling #stop. But if :dont_stop_if_pid_file_empty
+  #  always execute this command upon calling #stop. But if :dont_stop_if_pid_file_invalid
   #  is given, then daemon_controller will not do that if the PID file does not contain
   #  a valid number.
   #
@@ -209,7 +209,7 @@ class DaemonController
     @start_timeout = options[:start_timeout] || 15
     @stop_timeout = options[:stop_timeout] || 15
     @log_file_activity_timeout = options[:log_file_activity_timeout] || 7
-    @dont_stop_if_pid_file_empty = options[:dont_stop_if_pid_file_empty]
+    @dont_stop_if_pid_file_invalid = options[:dont_stop_if_pid_file_invalid]
     @daemonize_for_me = options[:daemonize_for_me]
     @keep_ios = options[:keep_ios] || []
     @lock_file = determine_lock_file(options, @identifier, @pid_file)
@@ -437,7 +437,7 @@ private
 
   def kill_daemon
     if @stop_command
-      if @dont_stop_if_pid_file_empty && read_pid_file.nil?
+      if @dont_stop_if_pid_file_invalid && read_pid_file.nil?
         return
       end
       begin
