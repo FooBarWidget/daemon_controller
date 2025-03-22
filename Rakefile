@@ -5,7 +5,7 @@ PACKAGE_VERSION = DaemonController::VERSION_STRING
 
 desc "Run the unit tests"
 task :test do
-  ruby "-S rspec -f documentation -c spec/*_spec.rb"
+  ruby "-S rspec spec/*_spec.rb"
 end
 
 desc "Build & upload gem"

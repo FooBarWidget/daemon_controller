@@ -4,6 +4,10 @@ root = true
 trim_trailing_whitespace = true
 charset = utf-8
 
+[Gemfile]
+indent_style = space
+indent_size = 2
+
 [*.rb]
 indent_style = space
 indent_size = 2

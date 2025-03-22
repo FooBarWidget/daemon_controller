@@ -1,6 +1,10 @@
 root = File.expand_path(File.join(File.dirname(__FILE__), ".."))
 Dir.chdir(root)
 
+# Ensure subprocesses (with could be a different Ruby) are
+# started without Bundler environment variables.
+ENV.replace(Bundler.with_unbundled_env { ENV.to_h.dup })
+
 if !ENV["MRI_RUBY"]
   if RUBY_PLATFORM.match?(/java/)
     # We need a Ruby implementation that starts fast and supports forking.

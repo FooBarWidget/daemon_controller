@@ -4,4 +4,8 @@ gemspec
 
 gem "rake"
 gem "rspec"
-gem "standard"
+gem "benchmark"
+
+group :lint do
+  gem "standard"
+end

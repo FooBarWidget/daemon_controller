@@ -7,8 +7,10 @@ GEM
   remote: https://rubygems.org/
   specs:
     ast (2.4.3)
+    benchmark (0.4.0)
     diff-lcs (1.6.0)
     json (2.10.2)
+    json (2.10.2-java)
     language_server-protocol (3.17.0.4)
     lint_roller (1.1.0)
     parallel (1.26.3)
@@ -16,6 +18,7 @@ GEM
       ast (~> 2.4.1)
       racc
     racc (1.8.1)
+    racc (1.8.1-java)
     rainbow (3.1.1)
     rake (13.2.1)
     regexp_parser (2.10.0)
@@ -68,8 +71,10 @@ GEM
 
 PLATFORMS
   ruby
+  universal-java-11
 
 DEPENDENCIES
+  benchmark
   daemon_controller!
   rake
   rspec
