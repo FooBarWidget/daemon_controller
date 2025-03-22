@@ -28,7 +28,7 @@ if Process.respond_to?(:spawn)
   require "rbconfig"
 end
 
-require "daemon_controller/lock_file"
+require_relative "daemon_controller/lock_file"
 
 # Main daemon controller object. See the README for an introduction and tutorial.
 class DaemonController

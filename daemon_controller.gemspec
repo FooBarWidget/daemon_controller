@@ -1,6 +1,5 @@
-$LOAD_PATH.unshift(File.expand_path(File.dirname(__FILE__) + "/lib"))
-require "daemon_controller/version"
-require "daemon_controller/packaging"
+require_relative "lib/daemon_controller/version"
+require_relative "lib/daemon_controller/packaging"
 
 Gem::Specification.new do |s|
   s.name = "daemon_controller"
