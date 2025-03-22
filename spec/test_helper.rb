@@ -2,18 +2,18 @@ root = File.expand_path(File.join(File.dirname(__FILE__), ".."))
 $LOAD_PATH.unshift(File.join(root, "lib"))
 Dir.chdir(root)
 
-if !ENV['MRI_RUBY']
-  if RUBY_PLATFORM =~ /java/
+if !ENV["MRI_RUBY"]
+  if RUBY_PLATFORM.match?(/java/)
     # We need a Ruby implementation that starts fast and supports forking.
     # JRuby is neither.
     abort "In order to run these tests in JRuby, you must set " +
       "the environment variable $MRI_RUBY to an MRI Ruby interpeter."
   else
-    require 'rbconfig'
+    require "rbconfig"
     rb_config = defined?(RbConfig) ? RbConfig::CONFIG : Config::CONFIG
-    ENV['MRI_RUBY'] = rb_config['bindir'] + '/' + rb_config['RUBY_INSTALL_NAME'] +
-      rb_config['EXEEXT']
-    puts ENV['MRI_RUBY']
+    ENV["MRI_RUBY"] = rb_config["bindir"] + "/" + rb_config["RUBY_INSTALL_NAME"] +
+      rb_config["EXEEXT"]
+    puts ENV["MRI_RUBY"]
   end
 end
 
@@ -26,14 +26,14 @@ trap("SIGQUIT") do
       output << "\n"
     end
     output << "--------------------"
-    STDERR.puts(output)
+    warn(output)
     STDERR.flush
   end
 end
 
 module TestHelper
   def new_controller(options = {})
-    @start_command = './spec/run_echo_server -l spec/echo_server.log -P spec/echo_server.pid'
+    @start_command = "./spec/run_echo_server -l spec/echo_server.log -P spec/echo_server.pid"
     if options[:wait1]
       @start_command << " --wait1 #{options[:wait1]}"
     end
@@ -50,45 +50,39 @@ module TestHelper
       @start_command << " --no-daemonize"
     end
     new_options = {
-      :identifier    => 'My Test Daemon',
-      :start_command => @start_command,
-      :ping_command  => method(:ping_echo_server),
-      :pid_file      => 'spec/echo_server.pid',
-      :log_file      => 'spec/echo_server.log',
-      :start_timeout => 3,
-      :stop_timeout  => 3
+      identifier: "My Test Daemon",
+      start_command: @start_command,
+      ping_command: method(:ping_echo_server),
+      pid_file: "spec/echo_server.pid",
+      log_file: "spec/echo_server.log",
+      start_timeout: 3,
+      stop_timeout: 3
     }.merge(options)
     @controller = DaemonController.new(new_options)
   end
 
   def ping_echo_server
-    begin
-      TCPSocket.new('127.0.0.1', 3230)
-      true
-    rescue SystemCallError
-      false
-    end
+    TCPSocket.new("127.0.0.1", 3230)
+    true
+  rescue SystemCallError
+    false
   end
 
   def write_file(filename, contents)
-    File.open(filename, 'w') do |f|
-      f.write(contents)
-    end
+    File.write(filename, contents)
   end
 
   def exec_is_slow?
-    return RUBY_PLATFORM == "java"
+    RUBY_PLATFORM == "java"
   end
 
   def process_is_alive?(pid)
-    begin
-      Process.kill(0, pid)
-      return true
-    rescue Errno::ESRCH
-      return false
-    rescue SystemCallError => e
-      return true
-    end
+    Process.kill(0, pid)
+    true
+  rescue Errno::ESRCH
+    false
+  rescue SystemCallError => e
+    true
   end
 
   def eventually(deadline_duration = 1, check_interval = 0.05)
@@ -113,7 +107,7 @@ class WaitingThread < Thread
     @go = false
     super do
       @mutex.synchronize do
-        while !@go
+        until @go
           @cond.wait(@mutex)
         end
       end

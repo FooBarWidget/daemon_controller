@@ -7,6 +7,10 @@ begin
   end
   sleep 30
 rescue SignalException
-  File.unlink("spec/echo_server.pid") rescue nil
+  begin
+    File.unlink("spec/echo_server.pid")
+  rescue
+    nil
+  end
   raise
 end

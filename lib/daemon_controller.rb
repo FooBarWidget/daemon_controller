@@ -19,16 +19,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-require 'tempfile'
-require 'fcntl'
-require 'socket'
-require 'pathname'
-require 'timeout'
+require "tempfile"
+require "fcntl"
+require "socket"
+require "pathname"
+require "timeout"
 if Process.respond_to?(:spawn)
-  require 'rbconfig'
+  require "rbconfig"
 end
 
-require 'daemon_controller/lock_file'
+require "daemon_controller/lock_file"
 
 # Main daemon controller object. See the README for an introduction and tutorial.
 class DaemonController
@@ -41,20 +41,28 @@ class DaemonController
 
   class Error < StandardError
   end
+
   class TimeoutError < Error
   end
+
   class AlreadyStarted < Error
   end
+
   class StartError < Error
   end
+
   class StartTimeout < TimeoutError
   end
+
   class StopError < Error
   end
+
   class StopTimeout < TimeoutError
   end
+
   class ConnectError < Error
   end
+
   class DaemonizationTimeout < TimeoutError
   end
 
@@ -252,11 +260,9 @@ class DaemonController
   def connect
     connection = nil
     @lock_file.shared_lock do
-      begin
-        connection = yield
-      rescue *ALLOWED_CONNECT_EXCEPTIONS
-        connection = nil
-      end
+      connection = yield
+    rescue *ALLOWED_CONNECT_EXCEPTIONS
+      connection = nil
     end
     if connection.nil?
       @lock_file.exclusive_lock do
@@ -297,16 +303,14 @@ class DaemonController
   # - StopTimeout - the daemon didn't stop in time.
   def stop
     @lock_file.exclusive_lock do
-      begin
-        Timeout.timeout(@stop_timeout, Timeout::Error) do
-          kill_daemon
-          wait_until do
-            !daemon_is_running?
-          end
+      Timeout.timeout(@stop_timeout, Timeout::Error) do
+        kill_daemon
+        wait_until do
+          !daemon_is_running?
         end
-      rescue Timeout::Error
-        raise StopTimeout, "Daemon '#{@identifier}' did not exit in time"
       end
+    rescue Timeout::Error
+      raise StopTimeout, "Daemon '#{@identifier}' did not exit in time"
     end
   end
 
@@ -353,7 +357,8 @@ class DaemonController
     RUBY_PLATFORM != "java"
   end
 
-private
+  private
+
   def start_without_locking
     if daemon_is_running?
       raise AlreadyStarted, "Daemon '#{@identifier}' is already started"
@@ -401,10 +406,10 @@ private
       if pid_file_available?
         kill_daemon_with_signal(true)
       end
-      if e.is_a?(DaemonizationTimeout)
-        result = :daemonization_timeout
+      result = if e.is_a?(DaemonizationTimeout)
+        :daemonization_timeout
       else
-        result = :start_timeout
+        :start_timeout
       end
     end
     if !result
@@ -454,9 +459,9 @@ private
     pid = read_pid_file
     if pid
       if force
-        Process.kill('SIGKILL', pid)
+        Process.kill("SIGKILL", pid)
       else
-        Process.kill('SIGTERM', pid)
+        Process.kill("SIGTERM", pid)
       end
     end
   rescue Errno::ESRCH, Errno::ENOENT
@@ -487,7 +492,7 @@ private
     rescue Errno::ENOENT
       return nil
     end
-    if pid =~ /\A\d+\Z/
+    if /\A\d+\Z/.match?(pid)
       pid.to_i
     else
       nil
@@ -513,20 +518,20 @@ private
   end
 
   def wait_until(sleep_interval = 0.1)
-    while !yield
+    until yield
       sleep(sleep_interval)
     end
   end
 
   def wait_until_pid_file_is_available_or_log_file_has_changed
-    while !(pid_file_available? || log_file_has_changed?)
+    until pid_file_available? || log_file_has_changed?
       sleep 0.1
     end
     pid_file_is_available?
   end
 
   def wait_until_daemon_responds_to_ping_or_has_exited_or_log_file_has_changed
-    while !(run_ping_command || !daemon_is_running? || log_file_has_changed?)
+    until run_ping_command || !daemon_is_running? || log_file_has_changed?
       sleep(@ping_interval)
     end
     run_ping_command
@@ -554,16 +559,24 @@ private
   end
 
   def save_log_file_information
-    @original_log_file_stat = File.stat(@log_file) rescue nil
+    @original_log_file_stat = begin
+      File.stat(@log_file)
+    rescue
+      nil
+    end
     @current_log_file_stat = @original_log_file_stat
   end
 
   def log_file_has_changed?
     if @current_log_file_stat
-      stat = File.stat(@log_file) rescue nil
+      stat = begin
+        File.stat(@log_file)
+      rescue
+        nil
+      end
       if stat
         result = @current_log_file_stat.mtime != stat.mtime ||
-                 @current_log_file_stat.size  != stat.size
+          @current_log_file_stat.size != stat.size
         @current_log_file_stat = stat
         result
       else
@@ -576,7 +589,7 @@ private
 
   def differences_in_log_file
     if @original_log_file_stat && @original_log_file_stat.file?
-      File.open(@log_file, 'r') do |f|
+      File.open(@log_file, "r") do |f|
         f.seek(@original_log_file_stat.size, IO::SEEK_SET)
         diff = f.read.strip
         if diff.empty?
@@ -640,38 +653,42 @@ private
       path == "/dev/stderr" ||
       path == "/dev/fd/1" ||
       path == "/dev/fd/2" ||
-      path =~ %r(\A/proc/([0-9]+|self)/fd/[12]\Z)
+      path =~ %r{\A/proc/([0-9]+|self)/fd/[12]\Z}
   end
 
   def run_command_while_capturing_output(command)
     # Create tempfile for storing the command's output.
-    tempfile = Tempfile.new('daemon-output')
-    tempfile.chmod(0666)
+    tempfile = Tempfile.new("daemon-output")
+    tempfile.chmod(0o666)
     tempfile_path = tempfile.path
     tempfile.close
 
     if self.class.fork_supported? || self.class.spawn_supported?
       if Process.respond_to?(:spawn)
         options = {
-          :in  => "/dev/null",
-          :out => tempfile_path,
-          :err => tempfile_path,
-          :close_others => true
+          in: "/dev/null",
+          out: tempfile_path,
+          err: tempfile_path,
+          close_others: true
         }
         @keep_ios.each do |io|
           options[io] = io
         end
-        if @daemonize_for_me
-          pid = Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
+        pid = if @daemonize_for_me
+          Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
             command, options)
         else
-          pid = Process.spawn(@env, command, options)
+          Process.spawn(@env, command, options)
         end
       else
         pid = safe_fork(@daemonize_for_me) do
           ObjectSpace.each_object(IO) do |obj|
             if !@keep_ios.include?(obj)
-              obj.close rescue nil
+              begin
+                obj.close
+              rescue
+                nil
+              end
             end
           end
           STDIN.reopen("/dev/null", "r")
@@ -700,19 +717,17 @@ private
         # If the daemon doesn't fork into the background
         # in time, then kill it.
         begin
-          Process.kill('SIGTERM', pid)
+          Process.kill("SIGTERM", pid)
         rescue SystemCallError
         end
         begin
           Timeout.timeout(5, Timeout::Error) do
-            begin
-              interruptable_waitpid(pid)
-            rescue SystemCallError
-            end
+            interruptable_waitpid(pid)
+          rescue SystemCallError
           end
         rescue Timeout::Error
           begin
-            Process.kill('SIGKILL', pid)
+            Process.kill("SIGKILL", pid)
             interruptable_waitpid(pid)
           rescue SystemCallError
           end
@@ -730,38 +745,46 @@ private
       end
 
       cmd = "#{command} >\"#{tempfile_path}\""
-      cmd << " 2>\"#{tempfile_path}\"" unless PLATFORM =~ /mswin/
+      cmd << " 2>\"#{tempfile_path}\"" unless PLATFORM.match?(/mswin/)
       if !system(cmd)
         raise StartError, File.read(tempfile_path).strip
       end
     end
   ensure
-    File.unlink(tempfile_path) rescue nil
+    begin
+      File.unlink(tempfile_path)
+    rescue
+      nil
+    end
   end
 
   def run_command_without_capturing_output(command)
     if self.class.fork_supported? || self.class.spawn_supported?
       if Process.respond_to?(:spawn)
         options = {
-          :in  => "/dev/null",
-          :out => :out,
-          :err => :err,
-          :close_others => true
+          in: "/dev/null",
+          out: :out,
+          err: :err,
+          close_others: true
         }
         @keep_ios.each do |io|
           options[io] = io
         end
-        if @daemonize_for_me
-          pid = Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
+        pid = if @daemonize_for_me
+          Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
             command, options)
         else
-          pid = Process.spawn(@env, command, options)
+          Process.spawn(@env, command, options)
         end
       else
         pid = safe_fork(@daemonize_for_me) do
           ObjectSpace.each_object(IO) do |obj|
             if !@keep_ios.include?(obj)
-              obj.close rescue nil
+              begin
+                obj.close
+              rescue
+                nil
+              end
             end
           end
           STDIN.reopen("/dev/null", "r")
@@ -788,19 +811,17 @@ private
         # If the daemon doesn't fork into the background
         # in time, then kill it.
         begin
-          Process.kill('SIGTERM', pid)
+          Process.kill("SIGTERM", pid)
         rescue SystemCallError
         end
         begin
           Timeout.timeout(5, Timeout::Error) do
-            begin
-              interruptable_waitpid(pid)
-            rescue SystemCallError
-            end
+            interruptable_waitpid(pid)
+          rescue SystemCallError
           end
         rescue Timeout::Error
           begin
-            Process.kill('SIGKILL', pid)
+            Process.kill("SIGKILL", pid)
             interruptable_waitpid(pid)
           rescue SystemCallError
           end
@@ -828,7 +849,11 @@ private
       begin
         value = @ping_command.call
         if value.respond_to?(:close)
-          value.close rescue nil
+          begin
+            value.close
+          rescue
+            nil
+          end
         end
         value
       rescue *ALLOWED_CONNECT_EXCEPTIONS
@@ -866,7 +891,7 @@ private
   end
 
   if !can_ping_unix_sockets?
-    require 'java'
+    require "java"
 
     def ping_socket(host_name, port)
       channel = java.nio.channels.SocketChannel.open
@@ -885,7 +910,7 @@ private
               return true
             end
           rescue java.net.ConnectException => e
-            if e.message =~ /Connection refused/i
+            if /Connection refused/i.match?(e.message)
               return false
             else
               throw e
@@ -904,53 +929,49 @@ private
     end
   else
     def ping_socket(socket_domain, sockaddr)
+      socket = Socket.new(socket_domain, Socket::Constants::SOCK_STREAM, 0)
       begin
-        socket = Socket.new(socket_domain, Socket::Constants::SOCK_STREAM, 0)
-        begin
-          socket.connect_nonblock(sockaddr)
-        rescue Errno::ENOENT, Errno::EINPROGRESS, Errno::EAGAIN, Errno::EWOULDBLOCK
-          if select(nil, [socket], nil, 0.1)
-            begin
-              socket.connect_nonblock(sockaddr)
-            rescue Errno::EISCONN
-            rescue Errno::EINVAL
-              if RUBY_PLATFORM =~ /freebsd/i
-                raise Errno::ECONNREFUSED
-              else
-                raise
-              end
+        socket.connect_nonblock(sockaddr)
+      rescue Errno::ENOENT, Errno::EINPROGRESS, Errno::EAGAIN, Errno::EWOULDBLOCK
+        if select(nil, [socket], nil, 0.1)
+          begin
+            socket.connect_nonblock(sockaddr)
+          rescue Errno::EISCONN
+          rescue Errno::EINVAL
+            if RUBY_PLATFORM.match?(/freebsd/i)
+              raise Errno::ECONNREFUSED
+            else
+              raise
             end
-          else
-            raise Errno::ECONNREFUSED
           end
+        else
+          raise Errno::ECONNREFUSED
         end
-        true
-      rescue Errno::ECONNREFUSED, Errno::ENOENT
-        false
-      ensure
-        socket.close if socket
       end
+      true
+    rescue Errno::ECONNREFUSED, Errno::ENOENT
+      false
+    ensure
+      socket.close if socket
     end
 
     def ping_tcp_socket(sockaddr)
-      begin
-        ping_socket(Socket::Constants::AF_INET, sockaddr)
-      rescue Errno::EAFNOSUPPORT
-        ping_socket(Socket::Constants::AF_INET6, sockaddr)
-      end
+      ping_socket(Socket::Constants::AF_INET, sockaddr)
+    rescue Errno::EAFNOSUPPORT
+      ping_socket(Socket::Constants::AF_INET6, sockaddr)
     end
   end
 
   def ruby_interpreter
-    if defined?(RbConfig)
-      rb_config = RbConfig::CONFIG
+    rb_config = if defined?(RbConfig)
+      RbConfig::CONFIG
     else
-      rb_config = Config::CONFIG
+      Config::CONFIG
     end
     File.join(
-      rb_config['bindir'],
-      rb_config['RUBY_INSTALL_NAME']
-    ) + rb_config['EXEEXT']
+      rb_config["bindir"],
+      rb_config["RUBY_INSTALL_NAME"]
+    ) + rb_config["EXEEXT"]
   end
 
   def safe_fork(double_fork)
@@ -976,13 +997,15 @@ private
       ensure
         exit!(0)
       end
-    else
-      if double_fork
-        Process.waitpid(pid) rescue nil
-        pid
-      else
-        pid
+    elsif double_fork
+      begin
+        Process.waitpid(pid)
+      rescue
+        nil
       end
+      pid
+    else
+      pid
     end
   end
 
@@ -997,7 +1020,7 @@ private
     # interruptable.
     def interruptable_waitpid(pid)
       result = nil
-      while !result
+      until result
         result = Process.waitpid(pid, Process::WNOHANG)
         sleep 0.01 if !result
       end

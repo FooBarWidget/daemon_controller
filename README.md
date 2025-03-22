@@ -12,11 +12,11 @@ It provides the following functionality:
 *   Starting daemons. If the daemon fails to start then an exception will be
     raised. *daemon_controller* can even detect failures that occur after the
     daemon has already daemonized.
-    
+
     Starting daemons is done in a race-condition-free manner. If another
     process using *daemon_controller* is trying to start the same daemon,
     then *daemon_controller* will guarantee serialization.
-    
+
     *daemon_controller* also raises an exception if it detects that the daemon
     is already started.
 *   Connecting to a daemon, starting it if it's not already started. This too
@@ -58,7 +58,7 @@ Enable our YUM repository:
     # RHEL 6, CentOS 6
     curl -L https://oss-binaries.phusionpassenger.com/yumgems/phusion-misc/el.repo | \
       sudo tee /etc/yum.repos.d/phusion-misc.repo
-    
+
     # Amazon Linux
     curl -L https://oss-binaries.phusionpassenger.com/yumgems/phusion-misc/amazon.repo | \
       sudo tee /etc/yum.repos.d/phusion-misc.repo
@@ -168,11 +168,11 @@ From the problem descriptions, it would become apparent that our wishlist is as
 follows. Why is this wishlist often not implemented? Let's go over them.
 
  -  **A daemon should be automatically started on demand, instead of requiring the user to manually start it.**
-    
+
     The most obvious problems are related to concurrency. Suppose that your web
     application has a search box, and you want to start the search daemon if it
     isn't already started, then connect to. Two problems will arise:
-    
+
      *  Suppose that Rails process A is still starting the daemon. At the same
         time, another visitor tries to search something, and Rails process B
         notices that the daemon is not running. If B tries to start the daemon
@@ -183,24 +183,24 @@ follows. Why is this wishlist often not implemented? Let's go over them.
         start. For example, if you wait 2 seconds, then try to connect to the
         daemon, and the daemon isn't done initializing yet, then it will seem as
         if the daemon failed to start.
-    
+
     These are the most probable reasons why people don't try to write
     auto-starting code, and instead require the user to start the daemon
     manually.
-    
+
     These problems, as well as several less obvious problems, are closely
     related to the next few points.
-    
+
  -  **The daemon starter must wait until the daemon is done initializing, no longer and no shorter**
-    
+
     Because only after the daemon is fully initialized, is it safe to connect
     to it. And because the user should not have to wait longer than he really
     has to. During startup, the daemon will have to be continuously checked
     whether it's done initializing or whether an error occured. Writing this
     code can be quite a hassle, which is why most people don't do it.
-    
+
  -  **The daemon starter must report any startup errors**
-    
+
     If the daemon starting command - e.g. `sphinx -c config_file.conf`,
     `apachectl start` or `mongrel_rails cluster::start` - reports startup
     errors, then all is fine as long as the user is starting the command from a
@@ -208,16 +208,16 @@ follows. Why is this wishlist often not implemented? Let's go over them.
     already gone into the background. Such errors are only reported to the log
     file.
     *The daemon starter should also check the log file for any startup errors.*
-    
+
     Furthermore, it should be able to raise startup errors as exceptions. This
     allows the the application to decide what to do with the error. For less
     experienced system administrators, the error might be displayed in the
     browser, allowing the administrators to become aware of the problem without
     forcing them to manually check the log files. Or the error might be emailed
     to a system administrator's email address.
-    
+
  -  **The daemon starter must be able to correct stale or corrupted PID files**
-    
+
     If the PID file is stale, or for some reason has been corrupted, then the
     daemon starter must be able to cope with that.
     *It should check whether the PID file contains a valid PID, and whether the PID exists.*
@@ -292,28 +292,28 @@ or [God](http://god.rubyforge.org/). Rather, it is a solution to the following
 problem:
 
 > **Hongli:** hey Ninh, do a 'git pull', I just implemented awesome searching
->    features in our application!  
->   **Ninh:** cool. *pulls from repository*  
->   **Ninh:** hey Hongli, it doesn't work.  
-> **Hongli:** what do you mean, it doesn't work?  
->   **Ninh:** it says "connection refused", or something  
+>    features in our application!
+>   **Ninh:** cool. *pulls from repository*
+>   **Ninh:** hey Hongli, it doesn't work.
+> **Hongli:** what do you mean, it doesn't work?
+>   **Ninh:** it says "connection refused", or something
 > **Hongli:** oh I forgot to mention it, you have to run the Sphinx search
 >    daemon before it works. type "rake sphinx:daemon:start" to do
->    that  
+>    that
 >   **Ninh:** great. but now I get a different error. something about
->    BackgrounDRb.  
+>    BackgrounDRb.
 > **Hongli:** oops, I forgot to mention this too. you need to start the
->    BackgrounDRb server with "rake backgroundrb:start_server"  
+>    BackgrounDRb server with "rake backgroundrb:start_server"
 >   **Ninh:** okay, so every time I want to use this app, I have to type
 >    "rake sphinx:daemon:start", "rake backgroundrb:start_server" and
->    "./script/server"?  
+>    "./script/server"?
 > **Hongli:** yep
 
 Imagine the above conversation becoming just:
 
 > **Hongli:** hey Ninh, do a 'git pull', I just implemented awesome searching
->    features in our application!  
->   **Ninh:** cool. *pulls from repository*  
+>    features in our application!
+>   **Ninh:** cool. *pulls from repository*
 >   **Ninh:** awesome, it works!
 
 This is not something that can be achieved with Monit/God. Monit/God are for
@@ -343,14 +343,14 @@ server must be running. For every test, you will want the unit test suite to:
 That can be done with the following code:
 
     require 'daemon_controller'
-    
+
     File.open("apache.conf", "w") do |f|
        f.write("PidFile apache.pid\n")
        f.write("LogFile apache.log\n")
        f.write("Listen 1234\n")
        f.write(... other relevant configuration options ...)
     end
-    
+
     controller = DaemonController.new(
        :identifier    => 'Apache web server',
        :start_command => 'apachectl -f apache.conf -k start',
@@ -360,10 +360,10 @@ That can be done with the following code:
        :start_timeout => 25
     )
     controller.start
-    
+
     .... apache is now started ....
     .... some test code here ....
-    
+
     controller.stop
 
 The `File.open` line is obvious: it writes the relevant Apache configuration
@@ -429,10 +429,10 @@ isn't running.
 This can be achieved with the following code:
 
     require 'daemon_controller'
-    
+
     class SearchServer
        SEARCH_SERVER_PORT = 1234
-    
+
        def initialize
           @controller = DaemonController.new(
              :identifier => 'Sphinx search server',
@@ -442,7 +442,7 @@ This can be achieved with the following code:
              :pid_file => 'tmp/pids/sphinx.pid',
              :log_file => 'log/sphinx.log')
        end
-       
+
        def query(search_terms)
           socket = @controller.connect do
              TCPSocket.new('localhost', SEARCH_SERVER_PORT)
@@ -450,7 +450,7 @@ This can be achieved with the following code:
           send_query(socket, search_terms)
           return retrieve_results(socket)
        end
-       
+
     private
        def before_start
           generate_configuration_file
@@ -458,7 +458,7 @@ This can be achieved with the following code:
              generate_index
           end
        end
-       
+
        ...
     end
 
@@ -506,11 +506,11 @@ synchronization. This has a few implications:
    Multiple threads can safely use daemon_controller concurrently. Multiple
    processes can safely use daemon_controller concurrently. There will be no
    race conditions.
-   
+
    However `flock()` is not implemented on Solaris. daemon_controller, if
    used in MRI does not currently work on Solaris. You need to use JRuby
    which does not use `flock()` to implement `File#flock`.
-   
+
  * On JRuby `File#flock` is implemented through the Java file locking API,
    which on Unix is implemented with the `fcntl()` system calls. This is a
    different kind of lock with very strange semantics.
@@ -524,7 +524,7 @@ synchronization. This has a few implications:
      cannot be used to synchronize threads. If a thread has obtained a file
      lock, then another thread within the same JVM process will not block upon
      trying to lock the same file.
-   
+
    In other words, if you're on JRuby then don't concurrently access
    daemon_controller from multiple threads without manual locking. Also be
    careful with mixing MRI processes that use daemon_controller with JRuby

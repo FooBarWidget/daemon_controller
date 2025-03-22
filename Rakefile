@@ -1,10 +1,10 @@
 $LOAD_PATH.unshift(File.expand_path(File.dirname(__FILE__) + "/lib"))
-require 'daemon_controller/version'
+require "daemon_controller/version"
 
-PACKAGE_NAME    = "daemon_controller"
+PACKAGE_NAME = "daemon_controller"
 PACKAGE_VERSION = DaemonController::VERSION_STRING
 PACKAGE_SIGNING_KEY = "0x0A212A8C"
-MAINTAINER_NAME  = "Hongli Lai"
+MAINTAINER_NAME = "Hongli Lai"
 MAINTAINER_EMAIL = "hongli@phusion.nl"
 
 desc "Run the unit tests"
@@ -13,7 +13,7 @@ task :test do
 end
 
 desc "Build, sign & upload gem"
-task 'package:release' do
+task "package:release" do
   sh "git tag -s release-#{PACKAGE_VERSION}"
   sh "gem build #{PACKAGE_NAME}.gemspec --sign --key #{PACKAGE_SIGNING_KEY}"
   puts "Proceed with pushing tag to Github and uploading the gem? [y/n]"
@@ -25,42 +25,40 @@ task 'package:release' do
   end
 end
 
-
 ##### Utilities #####
 
 def string_option(name, default_value = nil)
   value = ENV[name]
   if value.nil? || value.empty?
-    return default_value
+    default_value
   else
-    return value
+    value
   end
 end
 
 def boolean_option(name, default_value = false)
   value = ENV[name]
   if value.nil? || value.empty?
-    return default_value
+    default_value
   else
-    return value == "yes" || value == "on" || value == "true" || value == "1"
+    value == "yes" || value == "on" || value == "true" || value == "1"
   end
 end
 
-
 ##### Debian packaging support #####
 
-PKG_DIR         = string_option('PKG_DIR', "pkg")
-DEBIAN_NAME     = "ruby-daemon-controller"
+PKG_DIR = string_option("PKG_DIR", "pkg")
+DEBIAN_NAME = "ruby-daemon-controller"
 DEBIAN_PACKAGE_REVISION = 1
-ALL_DISTRIBUTIONS  = string_option('DEBIAN_DISTROS', 'trusty precise lucid').split(/[ ,]/)
+ALL_DISTRIBUTIONS = string_option("DEBIAN_DISTROS", "trusty precise lucid").split(/[ ,]/)
 ORIG_TARBALL_FILES = lambda do
-  require 'daemon_controller/packaging'
+  require "daemon_controller/packaging"
   Dir[*DAEMON_CONTROLLER_FILES] - Dir[*DAEMON_CONTROLLER_DEBIAN_EXCLUDE_FILES]
 end
 
 # Implements a simple preprocessor language which combines elements in the C
 # preprocessor with ERB:
-# 
+#
 #     Today
 #     #if @today == :fine
 #         is a fine day.
@@ -71,20 +69,20 @@ end
 #     #endif
 #     Let's go walking.
 #     Today is <%= Time.now %>.
-# 
+#
 # When run with...
-# 
+#
 #     Preprocessor.new.start('input.txt', 'output.txt', :today => :fine)
-# 
+#
 # ...will produce:
-# 
+#
 #     Today
 #     is a fine day.
 #     Let's go walking.
 #     Today is 2013-08-11 22:37:06 +0200.
-# 
+#
 # Highlights:
-# 
+#
 #  * #if blocks can be nested.
 #  * Expressions are Ruby expressions, evaluated within the binding of a
 #    Preprocessor::Evaluator object.
@@ -92,22 +90,22 @@ end
 #  * ERB compatible.
 class Preprocessor
   def initialize
-    require 'erb' if !defined?(ERB)
+    require "erb" if !defined?(ERB)
     @indentation_size = 4
-    @debug = boolean_option('DEBUG')
+    @debug = boolean_option("DEBUG")
   end
 
   def start(filename, output_filename, variables = {})
     if output_filename
       temp_output_filename = "#{output_filename}._new"
-      output = File.open(temp_output_filename, 'w')
+      output = File.open(temp_output_filename, "w")
     else
       output = STDOUT
     end
-    the_binding  = create_binding(variables)
-    context      = []
-    @filename    = filename
-    @lineno      = 1
+    the_binding = create_binding(variables)
+    context = []
+    @filename = filename
+    @lineno = 1
     @indentation = 0
 
     each_line(filename, the_binding) do |line|
@@ -203,46 +201,51 @@ class Preprocessor
       output.close
       stat = File.stat(filename)
       File.chmod(stat.mode, temp_output_filename)
-      File.chown(stat.uid, stat.gid, temp_output_filename) rescue nil
+      begin
+        File.chown(stat.uid, stat.gid, temp_output_filename)
+      rescue
+        nil
+      end
       File.rename(temp_output_filename, output_filename)
     end
   end
 
-private
+  private
+
   UBUNTU_DISTRIBUTIONS = {
-    "lucid"    => "10.04",
+    "lucid" => "10.04",
     "maverick" => "10.10",
-    "natty"    => "11.04",
-    "oneiric"  => "11.10",
-    "precise"  => "12.04",
-    "quantal"  => "12.10",
-    "raring"   => "13.04",
-    "saucy"    => "13.10",
-    "trusty"   => "14.04"
+    "natty" => "11.04",
+    "oneiric" => "11.10",
+    "precise" => "12.04",
+    "quantal" => "12.10",
+    "raring" => "13.04",
+    "saucy" => "13.10",
+    "trusty" => "14.04"
   }
   DEBIAN_DISTRIBUTIONS = {
-    "squeeze"  => "20110206",
-    "wheezy"   => "20130504",
-    "jessie"   => "20140000"
+    "squeeze" => "20110206",
+    "wheezy" => "20130504",
+    "jessie" => "20140000"
   }
   REDHAT_ENTERPRISE_DISTRIBUTIONS = {
-    "el6"      => "el6.0"
+    "el6" => "el6.0"
   }
   AMAZON_DISTRIBUTIONS = {
-    "amazon"   => "amazon"
+    "amazon" => "amazon"
   }
 
   # Provides the DSL that's accessible within.
   class Evaluator
     def _infer_distro_table(name)
       if UBUNTU_DISTRIBUTIONS.has_key?(name)
-        return UBUNTU_DISTRIBUTIONS
+        UBUNTU_DISTRIBUTIONS
       elsif DEBIAN_DISTRIBUTIONS.has_key?(name)
-        return DEBIAN_DISTRIBUTIONS
+        DEBIAN_DISTRIBUTIONS
       elsif REDHAT_ENTERPRISE_DISTRIBUTIONS.has_key?(name)
-        return REDHAT_ENTERPRISE_DISTRIBUTIONS
+        REDHAT_ENTERPRISE_DISTRIBUTIONS
       elsif AMAZON_DISTRIBUTIONS.has_key?(name)
-        return AMAZON_DISTRIBUTIONS
+        AMAZON_DISTRIBUTIONS
       end
     end
 
@@ -250,7 +253,7 @@ private
       if @distribution.nil?
         raise "The :distribution variable must be set"
       else
-        if expr =~ /^(>=|>|<=|<|==|\!=)[\s]*(.+)/
+        if expr =~ /^(>=|>|<=|<|==|!=)[\s]*(.+)/
           comparator = $1
           name = $2
         else
@@ -264,20 +267,20 @@ private
         return false if table1 != table2
         v1 = table1[@distribution]
         v2 = table2[name]
-        
+
         case comparator
         when ">"
-          return v1 > v2
+          v1 > v2
         when ">="
-          return v1 >= v2
+          v1 >= v2
         when "<"
-          return v1 < v2
+          v1 < v2
         when "<="
-          return v1 <= v2
+          v1 <= v2
         when "=="
-          return v1 == v2
+          v1 == v2
         when "!="
-          return v1 != v2
+          v1 != v2
         else
           raise "BUG"
         end
@@ -286,8 +289,8 @@ private
   end
 
   def each_line(filename, the_binding)
-    data = File.open(filename, 'r') do |f|
-      erb = ERB.new(f.read, nil, "-")
+    data = File.open(filename, "r") do |f|
+      erb = ERB.new(f.read, trim_mode: "-")
       erb.filename = filename
       erb.result(the_binding)
     end
@@ -295,7 +298,7 @@ private
       yield line.chomp
     end
   end
-  
+
   def recognize_command(line)
     if line =~ /^([\s\t]*)#(.+)/
       indentation_str = $1
@@ -309,10 +312,10 @@ private
       # Ignore shebangs and comments.
       return if name.nil?
 
-      args_string = command.sub(/^#{Regexp.escape(name)}[\s\t]*/, '')
-      return [name, args_string, indentation_str.to_s.size]
+      args_string = command.sub(/^#{Regexp.escape(name)}[\s\t]*/, "")
+      [name, args_string, indentation_str.to_s.size]
     else
-      return nil
+      nil
     end
   end
 
@@ -321,7 +324,7 @@ private
     variables.each_pair do |key, val|
       object.send(:instance_variable_set, "@#{key}", val)
     end
-    return object.instance_eval do
+    object.instance_eval do
       binding
     end
   end
@@ -345,21 +348,21 @@ private
     # Declare tabs as equivalent to 4 spaces. This is necessary for
     # Makefiles in which the use of tabs is required.
     found = $1.to_s.gsub("\t", "    ").size
-    
+
     if found >= @indentation
       # Tab-friendly way to remove indentation.
       remaining = @indentation
       line = line.dup
       while remaining > 0
-        if line[0..0] == " "
-          remaining -= 1
+        remaining -= if line[0..0] == " "
+          1
         else
           # This is a tab.
-          remaining -= 4
+          4
         end
         line.slice!(0, 1)
       end
-      return line
+      line
     else
       terminate "wrong indentation: found #{found} characters, should be at least #{@indentation}"
     end
@@ -375,7 +378,7 @@ private
 end
 
 def recursive_copy_files(files, destination_dir, preprocess = false, variables = {})
-  require 'fileutils' if !defined?(FileUtils)
+  require "fileutils" if !defined?(FileUtils)
   files.each_with_index do |filename, i|
     dir = File.dirname(filename)
     if !File.exist?("#{destination_dir}/#{dir}")
@@ -383,7 +386,7 @@ def recursive_copy_files(files, destination_dir, preprocess = false, variables =
     end
     if !File.directory?(filename)
       if preprocess && filename =~ /\.template$/
-        real_filename = filename.sub(/\.template$/, '')
+        real_filename = filename.sub(/\.template$/, "")
         FileUtils.install(filename, "#{destination_dir}/#{real_filename}")
         Preprocessor.new.start(filename, "#{destination_dir}/#{real_filename}",
           variables)
@@ -398,10 +401,10 @@ def recursive_copy_files(files, destination_dir, preprocess = false, variables =
 end
 
 def create_debian_package_dir(distribution)
-  require 'time'
+  require "time"
 
   variables = {
-    :distribution => distribution
+    distribution: distribution
   }
 
   root = "#{PKG_DIR}/#{distribution}"
@@ -419,12 +422,10 @@ def create_debian_package_dir(distribution)
     "\n" +
     " -- #{MAINTAINER_NAME} <#{MAINTAINER_EMAIL}>  #{Time.now.rfc2822}\n\n" +
     changelog
-  File.open("#{root}/debian/changelog", "w") do |f|
-    f.write(changelog)
-  end
+  File.write("#{root}/debian/changelog", changelog)
 end
 
-task 'debian:orig_tarball' do
+task "debian:orig_tarball" do
   if File.exist?("#{PKG_DIR}/#{DEBIAN_NAME}_#{PACKAGE_VERSION}.orig.tar.gz")
     puts "Debian orig tarball #{PKG_DIR}/#{DEBIAN_NAME}_#{PACKAGE_VERSION}.orig.tar.gz already exists."
   else
@@ -437,17 +438,17 @@ task 'debian:orig_tarball' do
 end
 
 desc "Build Debian source and binary package(s) for local testing"
-task 'debian:dev' do
+task "debian:dev" do
   sh "rm -f #{PKG_DIR}/#{DEBIAN_NAME}_#{PACKAGE_VERSION}.orig.tar.gz"
   Rake::Task["debian:clean"].invoke
   Rake::Task["debian:orig_tarball"].invoke
-  case distro = string_option('DISTRO', 'current')
-  when 'current'
-    distributions = [File.read("/etc/lsb-release").scan(/^DISTRIB_CODENAME=(.+)/).first.first]
-  when 'all'
-    distributions = ALL_DISTRIBUTIONS
+  distributions = case distro = string_option("DISTRO", "current")
+  when "current"
+    [File.read("/etc/lsb-release").scan(/^DISTRIB_CODENAME=(.+)/).first.first]
+  when "all"
+    ALL_DISTRIBUTIONS
   else
-    distributions = distro.split(',')
+    distro.split(",")
   end
   distributions.each do |distribution|
     create_debian_package_dir(distribution)
@@ -459,7 +460,7 @@ task 'debian:dev' do
 end
 
 desc "Build Debian source packages"
-task 'debian:source_packages' => 'debian:orig_tarball' do
+task "debian:source_packages" => "debian:orig_tarball" do
   ALL_DISTRIBUTIONS.each do |distribution|
     create_debian_package_dir(distribution)
   end
@@ -469,7 +470,7 @@ task 'debian:source_packages' => 'debian:orig_tarball' do
 end
 
 desc "Build Debian source packages to be uploaded to Launchpad"
-task 'debian:launchpad' => 'debian:orig_tarball' do
+task "debian:launchpad" => "debian:orig_tarball" do
   ALL_DISTRIBUTIONS.each do |distribution|
     create_debian_package_dir(distribution)
     sh "cd #{PKG_DIR}/#{distribution} && dpkg-checkbuilddeps"
@@ -480,9 +481,9 @@ task 'debian:launchpad' => 'debian:orig_tarball' do
 end
 
 desc "Clean Debian packaging products, except for orig tarball"
-task 'debian:clean' do
+task "debian:clean" do
   files = Dir["#{PKG_DIR}/*.{changes,build,deb,dsc,upload}"]
-  sh "rm -f #{files.join(' ')}"
+  sh "rm -f #{files.join(" ")}"
   sh "rm -rf #{PKG_DIR}/dev"
   ALL_DISTRIBUTIONS.each do |distribution|
     sh "rm -rf #{PKG_DIR}/#{distribution}"
@@ -490,26 +491,25 @@ task 'debian:clean' do
   sh "rm -rf #{PKG_DIR}/*.debian.tar.gz"
 end
 
-
 ##### RPM packaging support #####
 
 RPM_NAME = "rubygem-daemon_controller"
 RPMBUILD_ROOT = File.expand_path("~/rpmbuild")
-MOCK_OFFLINE = boolean_option('MOCK_OFFLINE', false)
+MOCK_OFFLINE = boolean_option("MOCK_OFFLINE", false)
 ALL_RPM_DISTROS = {
-  "el6" => { :mock_chroot_name => "epel-6", :distro_name => "Enterprise Linux 6" },
-  "amazon" => { :mock_chroot_name => "epel-6", :distro_name => "Amazon Linux" }
+  "el6" => {mock_chroot_name: "epel-6", distro_name: "Enterprise Linux 6"},
+  "amazon" => {mock_chroot_name: "epel-6", distro_name: "Amazon Linux"}
 }
 
 desc "Build gem for use in RPM building"
-task 'rpm:gem' do
+task "rpm:gem" do
   rpm_source_dir = "#{RPMBUILD_ROOT}/SOURCES"
   sh "gem build #{PACKAGE_NAME}.gemspec"
   sh "cp #{PACKAGE_NAME}-#{PACKAGE_VERSION}.gem #{rpm_source_dir}/"
 end
 
 desc "Build RPM for local machine"
-task 'rpm:local' => 'rpm:gem' do
+task "rpm:local" => "rpm:gem" do
   distro_id = `./rpm/get_distro_id.py`.strip
   rpm_spec_dir = "#{RPMBUILD_ROOT}/SPECS"
   spec_target_dir = "#{rpm_spec_dir}/#{distro_id}"
@@ -519,14 +519,14 @@ task 'rpm:local' => 'rpm:gem' do
   puts "Generating #{spec_target_file}"
   Preprocessor.new.start("rpm/#{RPM_NAME}.spec.template",
     spec_target_file,
-    :distribution => distro_id)
+    distribution: distro_id)
 
   sh "rpmbuild -ba #{spec_target_file}"
 end
 
 def create_rpm_build_task(distro_id, mock_chroot_name, distro_name)
   desc "Build RPM for #{distro_name}"
-  task "rpm:#{distro_id}" => 'rpm:gem' do
+  task "rpm:#{distro_id}" => "rpm:gem" do
     rpm_spec_dir = "#{RPMBUILD_ROOT}/SPECS"
     spec_target_dir = "#{rpm_spec_dir}/#{distro_id}"
     spec_target_file = "#{spec_target_dir}/#{RPM_NAME}.spec"
@@ -536,7 +536,7 @@ def create_rpm_build_task(distro_id, mock_chroot_name, distro_name)
     puts "Generating #{spec_target_file}"
     Preprocessor.new.start("rpm/#{RPM_NAME}.spec.template",
       spec_target_file,
-      :distribution => distro_id)
+      distribution: distro_id)
 
     sh "rpmbuild -bs #{spec_target_file}"
     sh "mock --verbose #{maybe_offline} " +

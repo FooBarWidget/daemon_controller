@@ -1,16 +1,16 @@
 #!/usr/bin/env ruby
 # A simple echo server, used by the unit test.
-require 'socket'
-require 'optparse'
+require "socket"
+require "optparse"
 
 options = {
-  :port => 3230,
-  :chdir => "/",
-  :log_file => "/dev/null",
-  :wait1 => 0,
-  :wait2 => 0,
-  :stop_time => 0,
-  :daemonize => true
+  port: 3230,
+  chdir: "/",
+  log_file: "/dev/null",
+  wait1: 0,
+  wait2: 0,
+  stop_time: 0,
+  daemonize: true
 }
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: echo_server.rb [options]"
@@ -56,40 +56,42 @@ end
 
 if options[:pid_file]
   if File.exist?(options[:pid_file])
-    STDERR.puts "*** ERROR: pid file #{options[:pid_file]} exists."
+    warn "*** ERROR: pid file #{options[:pid_file]} exists."
     exit 1
   end
 end
 
-if ENV['ENV_FILE']
-  options[:env_file] = File.expand_path(ENV['ENV_FILE'])
+if ENV["ENV_FILE"]
+  options[:env_file] = File.expand_path(ENV["ENV_FILE"])
 end
 
 def main(options)
-  STDIN.reopen("/dev/null", 'r')
-  STDOUT.reopen(options[:log_file], 'a')
-  STDERR.reopen(options[:log_file], 'a')
+  STDIN.reopen("/dev/null", "r")
+  STDOUT.reopen(options[:log_file], "a")
+  STDERR.reopen(options[:log_file], "a")
   STDOUT.sync = true
   STDERR.sync = true
   Dir.chdir(options[:chdir])
   File.umask(0)
 
   if options[:env_file]
-    File.open(options[:env_file], 'w') do |f|
-      f.write("\0")
-    end
+    File.write(options[:env_file], "\0")
     at_exit do
-      File.unlink(options[:env_file]) rescue nil
+      File.unlink(options[:env_file])
+    rescue
+      nil
     end
   end
 
   if options[:pid_file]
     sleep(options[:wait1])
-    File.open(options[:pid_file], 'w') do |f|
+    File.open(options[:pid_file], "w") do |f|
       f.puts(Process.pid)
     end
     at_exit do
-      File.unlink(options[:pid_file]) rescue nil
+      File.unlink(options[:pid_file])
+    rescue
+      nil
     end
   end
 
@@ -99,7 +101,7 @@ def main(options)
     exit 2
   end
 
-  server = TCPServer.new('127.0.0.1', options[:port])
+  server = TCPServer.new("127.0.0.1", options[:port])
   begin
     puts "*** #{Time.now}: echo server started"
     while (client = server.accept)
@@ -112,13 +114,17 @@ def main(options)
       rescue EOFError
       ensure
         puts "#{Time.now}: connection closed"
-        client.close rescue nil
+        begin
+          client.close
+        rescue
+          nil
+        end
       end
     end
   rescue SignalException
     exit 2
   rescue => e
-    puts e.to_s
+    puts e
     puts "    " << e.backtrace.join("\n    ")
     exit 3
   ensure

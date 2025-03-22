@@ -1,4 +1,5 @@
 .DS_Store
+.vscode
 *.gem
 spec/echo_server.log
 spec/echo_server.pid

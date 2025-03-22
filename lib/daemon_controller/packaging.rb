@@ -20,7 +20,7 @@
 # THE SOFTWARE.
 
 DAEMON_CONTROLLER_FILES = [
-  "README.markdown", "LICENSE.txt", "Rakefile", "daemon_controller.gemspec",
+  "README.md", "LICENSE.txt", "Rakefile", "daemon_controller.gemspec",
   "lib/**/*.rb",
   "debian.template/**/*",
   "rpm/**/*",

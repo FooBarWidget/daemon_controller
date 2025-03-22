@@ -1,9 +1,9 @@
 require File.expand_path(File.join(File.dirname(__FILE__), "test_helper"))
-require 'daemon_controller'
-require 'benchmark'
-require 'socket'
-require 'tmpdir'
-require 'shellwords'
+require "daemon_controller"
+require "benchmark"
+require "socket"
+require "tmpdir"
+require "shellwords"
 
 describe DaemonController, "#start" do
   before :each do
@@ -24,19 +24,19 @@ describe DaemonController, "#start" do
   end
 
   it "deletes existing PID file before starting the daemon" do
-    write_file('spec/echo_server.pid', '1234')
+    write_file("spec/echo_server.pid", "1234")
     @controller.should_receive(:daemon_is_running?).and_return(false)
     @controller.should_receive(:spawn_daemon)
     @controller.should_receive(:pid_file_available?).and_return(true)
     @controller.should_receive(:run_ping_command).at_least(:once).and_return(true)
     @controller.start
-    expect(File.exist?('spec/echo_server.pid')).to be false
+    expect(File.exist?("spec/echo_server.pid")).to be false
   end
 
   it "blocks until the daemon has written to its PID file" do
     thread = WaitingThread.new do
       sleep 0.15
-      write_file('spec/echo_server.pid', '1234')
+      write_file("spec/echo_server.pid", "1234")
     end
     expect(@controller).to receive(:daemon_is_running?) { false }
     expect(@controller).to receive(:spawn_daemon) { thread.go! }
@@ -45,7 +45,7 @@ describe DaemonController, "#start" do
       result = Benchmark.measure do
         @controller.start
       end
-      (0.15 .. 0.30).should === result.real
+      (0.15..0.30).should === result.real
     ensure
       thread.join
     end
@@ -69,14 +69,14 @@ describe DaemonController, "#start" do
       result = Benchmark.measure do
         @controller.start
       end
-      (0.15 .. 0.30).should === result.real
+      (0.15..0.30).should === result.real
     ensure
       thread.join
     end
   end
 
   it "works when the log file is not a regular file" do
-    new_controller(:log_file => "/dev/stderr")
+    new_controller(log_file: "/dev/stderr")
     @controller.start
     expect(ping_echo_server).to be true
     @controller.stop
@@ -92,21 +92,21 @@ describe DaemonController, "#start" do
       min_start_timeout = 0.15
       max_start_timeout = 0.30
     end
-    new_controller(:start_command => 'sleep 2', :start_timeout => start_timeout)
+    new_controller(start_command: "sleep 2", start_timeout: start_timeout)
     start_time = Time.now
     end_time = nil
     expect(@controller).to receive(:start_timed_out) { end_time = Time.now }
     begin
       lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
-      (min_start_timeout .. max_start_timeout).should === end_time - start_time
+      (min_start_timeout..max_start_timeout).should === end_time - start_time
     ensure
       @controller.stop
     end
   end
 
   it "kills the daemon forcefully if the daemon has forked but doesn't " <<
-     "become pingable in time, and there's a PID file" do
-    new_controller(:wait2 => 3, :start_timeout => 1)
+    "become pingable in time, and there's a PID file" do
+    new_controller(wait2: 3, start_timeout: 1)
     pid = nil
     expect(@controller).to receive(:start_timed_out) {
       @controller.send(:wait_until) do
@@ -125,46 +125,52 @@ describe DaemonController, "#start" do
       # it's killed with SIGKILL.
       expect(File.exist?("spec/echo_server.pid")).to be true
     ensure
-      File.unlink("spec/echo_server.pid") rescue nil
+      begin
+        File.unlink("spec/echo_server.pid")
+      rescue
+        nil
+      end
     end
   end
 
   if DaemonController.send(:fork_supported?) || DaemonController.send(:spawn_supported?)
     it "kills the daemon if it doesn't start in time and hasn't forked " <<
-       "yet, on platforms where Ruby supports fork() or Process.spawn" do
-      begin
-        new_controller(:start_command => "./spec/unresponsive_daemon.rb",
-          :start_timeout => 0.2)
-        pid = nil
-        expect(@controller).to receive(:daemonization_timed_out) {
-          @controller.send(:wait_until) do
-            @controller.send(:pid_file_available?)
-          end
-          pid = @controller.send(:read_pid_file)
-        }
-        block = lambda { @controller.start }
-        block.should raise_error(DaemonController::StartTimeout, /didn't daemonize in time/)
-        eventually(1) do
-          !process_is_alive?(pid)
+      "yet, on platforms where Ruby supports fork() or Process.spawn" do
+      new_controller(start_command: "./spec/unresponsive_daemon.rb",
+        start_timeout: 0.2)
+      pid = nil
+      expect(@controller).to receive(:daemonization_timed_out) {
+        @controller.send(:wait_until) do
+          @controller.send(:pid_file_available?)
         end
-      ensure
-        File.unlink("spec/echo_server.pid") rescue nil
+        pid = @controller.send(:read_pid_file)
+      }
+      block = lambda { @controller.start }
+      block.should raise_error(DaemonController::StartTimeout, /didn't daemonize in time/)
+      eventually(1) do
+        !process_is_alive?(pid)
+      end
+    ensure
+      begin
+        File.unlink("spec/echo_server.pid")
+      rescue
+        nil
       end
     end
   end
 
   it "raises an error if the daemon exits with an error before forking" do
-    new_controller(:start_command => 'false')
+    new_controller(start_command: "false")
     lambda { @controller.start }.should raise_error(DaemonController::Error)
   end
 
   it "raises an error if the daemon exits with an error after forking" do
-    new_controller(:crash_before_bind => true, :log_file_activity_timeout => 0.2)
+    new_controller(crash_before_bind: true, log_file_activity_timeout: 0.2)
     lambda { @controller.start }.should raise_error(DaemonController::Error)
   end
 
   specify "the daemon's error output before forking is made available in the exception" do
-    new_controller(:start_command => '(echo hello world; false)')
+    new_controller(start_command: "(echo hello world; false)")
     begin
       @controller.start
     rescue DaemonController::Error => e
@@ -173,7 +179,7 @@ describe DaemonController, "#start" do
   end
 
   specify "the daemon's error output after forking is made available in the exception" do
-    new_controller(:crash_before_bind => true, :log_file_activity_timeout => 0.1)
+    new_controller(crash_before_bind: true, log_file_activity_timeout: 0.1)
     begin
       @controller.start
       violated
@@ -183,9 +189,9 @@ describe DaemonController, "#start" do
   end
 
   specify "the daemon's error output is not available if the log file is not a regular file" do
-    new_controller(:crash_before_bind => true,
-      :log_file_activity_timeout => 0.1,
-      :log_file => "/dev/stderr")
+    new_controller(crash_before_bind: true,
+      log_file_activity_timeout: 0.1,
+      log_file: "/dev/stderr")
     begin
       @controller.start
       violated
@@ -196,7 +202,10 @@ describe DaemonController, "#start" do
 
   specify "the start command may be a Proc" do
     called = true
-    new_controller(:start_command => lambda { called = true; @start_command })
+    new_controller(start_command: lambda {
+      called = true
+      @start_command
+    })
     begin
       @controller.start
     ensure
@@ -208,11 +217,11 @@ describe DaemonController, "#start" do
   specify "if the start command is a Proc then it is called after before_start" do
     log = []
     new_controller(
-      :start_command => lambda {
+      start_command: lambda {
         log << "start_command"
         @start_command
       },
-      :before_start => lambda { log << "before_start" }
+      before_start: lambda { log << "before_start" }
     )
     begin
       @controller.start
@@ -226,7 +235,7 @@ describe DaemonController, "#start" do
     it "keeps the file descriptors in 'keep_ios' open" do
       a, b = IO.pipe
       begin
-        new_controller(:keep_ios => [b])
+        new_controller(keep_ios: [b])
         begin
           @controller.start
           b.close
@@ -241,7 +250,7 @@ describe DaemonController, "#start" do
     end
 
     it "performs the daemonization on behalf of the daemon if 'daemonize_for_me' is set" do
-      new_controller(:no_daemonize => true, :daemonize_for_me => true)
+      new_controller(no_daemonize: true, daemonize_for_me: true)
       @controller.start
       expect(ping_echo_server).to be true
       @controller.stop
@@ -249,10 +258,10 @@ describe DaemonController, "#start" do
   end
 
   it "receives environment variables" do
-    new_controller(:env => {'ENV_FILE' => 'spec/env_file.tmp'})
-    File.unlink('spec/env_file.tmp') if File.exist?('spec/env_file.tmp')
+    new_controller(env: {"ENV_FILE" => "spec/env_file.tmp"})
+    File.unlink("spec/env_file.tmp") if File.exist?("spec/env_file.tmp")
     @controller.start
-    expect(File.exist?('spec/env_file.tmp')).to be true
+    expect(File.exist?("spec/env_file.tmp")).to be true
     @controller.stop
   end
 end
@@ -273,7 +282,7 @@ describe DaemonController, "#stop" do
   end
 
   it "waits until the daemon is no longer running" do
-    new_controller(:stop_time => 0.3)
+    new_controller(stop_time: 0.3)
     @controller.start
     result = Benchmark.measure do
       @controller.stop
@@ -283,7 +292,7 @@ describe DaemonController, "#stop" do
   end
 
   it "raises StopTimeout if the daemon does not stop in time" do
-    new_controller(:stop_time => 0.3, :stop_timeout => 0.1)
+    new_controller(stop_time: 0.3, stop_timeout: 0.1)
     @controller.start
     begin
       lambda { @controller.stop }.should raise_error(DaemonController::StopTimeout)
@@ -294,13 +303,13 @@ describe DaemonController, "#stop" do
 
   describe "if stop command was given" do
     it "raises StopError if the stop command exits with an error" do
-      new_controller(:stop_command => '(echo hello world; false)')
+      new_controller(stop_command: "(echo hello world; false)")
       begin
         begin
           @controller.stop
           violated
         rescue DaemonController::StopError => e
-          e.message.should == 'hello world'
+          e.message.should == "hello world"
         end
       ensure
         new_controller.stop
@@ -311,23 +320,21 @@ describe DaemonController, "#stop" do
     end
 
     it "calls the stop command if the PID file is invalid and :dont_stop_if_pid_file_invalid is not set" do
-      begin
-        Dir.mktmpdir do |tmpdir|
-          File.open('spec/echo_server.pid', 'w').close
-          new_controller(:stop_command => "touch #{Shellwords.escape tmpdir}/stopped")
-          @controller.stop
-          expect(File.exist?("#{tmpdir}/stopped")).to be_truthy
-        end
-      ensure
-        @controller = nil
+      Dir.mktmpdir do |tmpdir|
+        File.open("spec/echo_server.pid", "w").close
+        new_controller(stop_command: "touch #{Shellwords.escape tmpdir}/stopped")
+        @controller.stop
+        expect(File.exist?("#{tmpdir}/stopped")).to be_truthy
       end
+    ensure
+      @controller = nil
     end
 
     it "does not call the stop command if the PID file is invalid and :dont_stop_if_pid_file_invalid is set" do
       Dir.mktmpdir do |tmpdir|
-        File.open('spec/echo_server.pid', 'w').close
-        new_controller(:stop_command => "touch #{Shellwords.escape tmpdir}/stopped",
-          :dont_stop_if_pid_file_invalid => true)
+        File.open("spec/echo_server.pid", "w").close
+        new_controller(stop_command: "touch #{Shellwords.escape tmpdir}/stopped",
+          dont_stop_if_pid_file_invalid: true)
         @controller.stop
         expect(File.exist?("#{tmpdir}/stopped")).to be_falsey
       end
@@ -346,7 +353,7 @@ describe DaemonController, "#restart" do
     @controller.restart
   end
 
-  describe 'with no restart command' do
+  describe "with no restart command" do
     it "restart the daemon using stop and start" do
       @controller.should_receive(:stop)
       @controller.should_receive(:start)
@@ -354,10 +361,10 @@ describe DaemonController, "#restart" do
     end
   end
 
-  describe 'with a restart_command' do
-    it 'restarts the daemon using the restart_command' do
+  describe "with a restart_command" do
+    it "restarts the daemon using the restart_command" do
       stop_cmd = "echo 'hello world'"
-      new_controller :restart_command => stop_cmd
+      new_controller restart_command: stop_cmd
 
       @controller.should_receive(:run_command).with(stop_cmd)
       @controller.restart
@@ -374,7 +381,7 @@ describe DaemonController, "#connect" do
 
   it "starts the daemon if it isn't already running" do
     socket = @controller.connect do
-      TCPSocket.new('localhost', 3230)
+      TCPSocket.new("localhost", 3230)
     end
     socket.close
     @controller.stop
@@ -384,7 +391,7 @@ describe DaemonController, "#connect" do
     @controller.start
     begin
       socket = @controller.connect do
-        TCPSocket.new('localhost', 3230)
+        TCPSocket.new("localhost", 3230)
       end
       socket.close
     ensure
@@ -398,61 +405,66 @@ describe DaemonController do
 
   after :each do
     @server.close if @server && !@server.closed?
-    File.unlink('spec/foo.sock') rescue nil
+    begin
+      File.unlink("spec/foo.sock")
+    rescue
+      nil
+    end
   end
 
   specify "if the ping command is a block that raises Errno::ECONNREFUSED, then that's " <<
-          "an indication that the daemon cannot be connected to" do
-    new_controller(:ping_command => lambda do
+    "an indication that the daemon cannot be connected to" do
+    new_controller(ping_command: lambda do
       raise Errno::ECONNREFUSED, "dummy"
     end)
     expect(@controller.send(:run_ping_command)).to be false
   end
 
   specify "if the ping command is a block that returns an object that responds to #close, " <<
-          "then the close method will be called on that object" do
-    @server = TCPServer.new('localhost', 8278)
+    "then the close method will be called on that object" do
+    @server = TCPServer.new("localhost", 8278)
     socket = nil
-    new_controller(:ping_command => lambda do
-      socket = TCPSocket.new('localhost', 8278)
+    new_controller(ping_command: lambda do
+      socket = TCPSocket.new("localhost", 8278)
     end)
     @controller.send(:run_ping_command)
     socket.should be_closed
   end
 
   specify "if the ping command is a block that returns an object that responds to #close, " <<
-          "and #close raises an exception, then that exception is ignored" do
-    @server = TCPServer.new('localhost', 8278)
+    "and #close raises an exception, then that exception is ignored" do
+    @server = TCPServer.new("localhost", 8278)
     o = Object.new
     expect(o).to receive(:close) { raise StandardError, "foo" }
-    new_controller(:ping_command => lambda do
+    new_controller(ping_command: lambda do
       o
     end)
     lambda { @controller.send(:run_ping_command) }.should_not raise_error
   end
 
   specify "the ping command may be [:tcp, hostname, port]" do
-    new_controller(:ping_command => [:tcp, "127.0.0.1", 8278])
+    new_controller(ping_command: [:tcp, "127.0.0.1", 8278])
     expect(@controller.send(:run_ping_command)).to be false
 
-    @server = TCPServer.new('127.0.0.1', 8278)
+    @server = TCPServer.new("127.0.0.1", 8278)
     expect(@controller.send(:run_ping_command)).to be true
   end
 
   if DaemonController.can_ping_unix_sockets?
     specify "the ping command may be [:unix, filename]" do
-      new_controller(:ping_command => [:unix, "spec/foo.sock"])
+      new_controller(ping_command: [:unix, "spec/foo.sock"])
       expect(@controller.send(:run_ping_command)).to be false
 
-      @server = UNIXServer.new('spec/foo.sock')
+      @server = UNIXServer.new("spec/foo.sock")
       expect(@controller.send(:run_ping_command)).to be true
     end
   else
     specify "a ping command of type [:unix, filename] is not supported on this Ruby implementation" do
-      new_controller(:ping_command => [:unix, "spec/foo.sock"])
-      @server = UNIXServer.new('spec/foo.sock')
+      new_controller(ping_command: [:unix, "spec/foo.sock"])
+      @server = UNIXServer.new("spec/foo.sock")
       lambda { @controller.send(:run_ping_command) }.should raise_error(
-        "Pinging Unix domain sockets is not supported on this Ruby implementation")
+        "Pinging Unix domain sockets is not supported on this Ruby implementation"
+      )
     end
   end
 end
