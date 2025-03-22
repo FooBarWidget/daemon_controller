@@ -1,0 +1,5 @@
+ignore:
+  - "**/*.rb":
+      - Style/InfiniteLoop
+      - Style/SafeNavigation
+      - Style/FileNull

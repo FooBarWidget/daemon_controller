@@ -104,7 +104,7 @@ describe DaemonController, "#start" do
     end
   end
 
-  it "kills the daemon forcefully if the daemon has forked but doesn't " <<
+  it "kills the daemon forcefully if the daemon has forked but doesn't " \
     "become pingable in time, and there's a PID file" do
     new_controller(wait2: 3, start_timeout: 1)
     pid = nil
@@ -134,7 +134,7 @@ describe DaemonController, "#start" do
   end
 
   if DaemonController.send(:fork_supported?) || DaemonController.send(:spawn_supported?)
-    it "kills the daemon if it doesn't start in time and hasn't forked " <<
+    it "kills the daemon if it doesn't start in time and hasn't forked " \
       "yet, on platforms where Ruby supports fork() or Process.spawn" do
       new_controller(start_command: "./spec/unresponsive_daemon.rb",
         start_timeout: 0.2)
@@ -412,7 +412,7 @@ describe DaemonController do
     end
   end
 
-  specify "if the ping command is a block that raises Errno::ECONNREFUSED, then that's " <<
+  specify "if the ping command is a block that raises Errno::ECONNREFUSED, then that's " \
     "an indication that the daemon cannot be connected to" do
     new_controller(ping_command: lambda do
       raise Errno::ECONNREFUSED, "dummy"
@@ -420,7 +420,7 @@ describe DaemonController do
     expect(@controller.send(:run_ping_command)).to be false
   end
 
-  specify "if the ping command is a block that returns an object that responds to #close, " <<
+  specify "if the ping command is a block that returns an object that responds to #close, " \
     "then the close method will be called on that object" do
     @server = TCPServer.new("localhost", 8278)
     socket = nil
@@ -431,7 +431,7 @@ describe DaemonController do
     socket.should be_closed
   end
 
-  specify "if the ping command is a block that returns an object that responds to #close, " <<
+  specify "if the ping command is a block that returns an object that responds to #close, " \
     "and #close raises an exception, then that exception is ignored" do
     @server = TCPServer.new("localhost", 8278)
     o = Object.new

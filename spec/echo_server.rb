@@ -66,11 +66,11 @@ if ENV["ENV_FILE"]
 end
 
 def main(options)
-  STDIN.reopen("/dev/null", "r")
-  STDOUT.reopen(options[:log_file], "a")
-  STDERR.reopen(options[:log_file], "a")
-  STDOUT.sync = true
-  STDERR.sync = true
+  $stdin.reopen("/dev/null", "r")
+  $stdout.reopen(options[:log_file], "a")
+  $stderr.reopen(options[:log_file], "a")
+  $stdout.sync = true
+  $stderr.sync = true
   Dir.chdir(options[:chdir])
   File.umask(0)
 

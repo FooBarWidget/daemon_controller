@@ -66,6 +66,15 @@ class DaemonController
   class DaemonizationTimeout < TimeoutError
   end
 
+  def self.fork_supported?
+    RUBY_PLATFORM != "java" && RUBY_PLATFORM !~ /win32/
+  end
+
+  def self.spawn_supported?
+    # Process.spawn doesn't work very well in JRuby.
+    Process.respond_to?(:spawn) && RUBY_PLATFORM != "java"
+  end
+
   # Create a new DaemonController object.
   #
   # === Mandatory options
@@ -369,7 +378,6 @@ class DaemonController
       started = false
       before_start
       Timeout.timeout(@start_timeout, Timeout::Error) do
-        done = false
         spawn_daemon
         record_activity
 
@@ -494,8 +502,6 @@ class DaemonController
     end
     if /\A\d+\Z/.match?(pid)
       pid.to_i
-    else
-      nil
     end
   end
 
@@ -598,8 +604,6 @@ class DaemonController
           diff
         end
       end
-    else
-      nil
     end
   rescue Errno::ENOENT, Errno::ESPIPE
     # ESPIPE means the log file is a pipe.
@@ -612,15 +616,6 @@ class DaemonController
     else
       LockFile.new(File.expand_path(pid_file + ".lock"))
     end
-  end
-
-  def self.fork_supported?
-    RUBY_PLATFORM != "java" && RUBY_PLATFORM !~ /win32/
-  end
-
-  def self.spawn_supported?
-    # Process.spawn doesn't work very well in JRuby.
-    Process.respond_to?(:spawn) && RUBY_PLATFORM != "java"
   end
 
   def run_command(command)
@@ -691,9 +686,9 @@ class DaemonController
               end
             end
           end
-          STDIN.reopen("/dev/null", "r")
-          STDOUT.reopen(tempfile_path, "w")
-          STDERR.reopen(tempfile_path, "w")
+          $stdin.reopen("/dev/null", "r")
+          $stdout.reopen(tempfile_path, "w")
+          $stderr.reopen(tempfile_path, "w")
           ENV.update(@env)
           exec(command)
         end
@@ -787,7 +782,7 @@ class DaemonController
               end
             end
           end
-          STDIN.reopen("/dev/null", "r")
+          $stdin.reopen("/dev/null", "r")
           ENV.update(@env)
           exec(command)
         end
@@ -903,7 +898,6 @@ class DaemonController
         end
 
         deadline = Time.now.to_f + 0.1
-        done = false
         while true
           begin
             if channel.finish_connect
@@ -987,12 +981,13 @@ class DaemonController
         else
           yield
         end
-      rescue Exception => e
-        message = "*** Exception #{e.class} " <<
-          "(#{e}) (process #{$$}):\n" <<
-          "\tfrom " << e.backtrace.join("\n\tfrom ")
-        STDERR.write(e)
-        STDERR.flush
+      rescue Exception => e # standard:disable Lint/RescueException
+        message = "*** Exception #{e.class} " \
+          "(#{e}) (process #{$$}):\n" \
+          "\tfrom " +
+          e.backtrace.join("\n\tfrom ")
+        $stderr.write(e)
+        $stderr.flush
         exit!
       ensure
         exit!(0)

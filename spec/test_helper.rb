@@ -1,12 +1,11 @@
 root = File.expand_path(File.join(File.dirname(__FILE__), ".."))
-$LOAD_PATH.unshift(File.join(root, "lib"))
 Dir.chdir(root)
 
 if !ENV["MRI_RUBY"]
   if RUBY_PLATFORM.match?(/java/)
     # We need a Ruby implementation that starts fast and supports forking.
     # JRuby is neither.
-    abort "In order to run these tests in JRuby, you must set " +
+    abort "In order to run these tests in JRuby, you must set " \
       "the environment variable $MRI_RUBY to an MRI Ruby interpeter."
   else
     require "rbconfig"
@@ -27,7 +26,7 @@ trap("SIGQUIT") do
     end
     output << "--------------------"
     warn(output)
-    STDERR.flush
+    $stderr.flush
   end
 end
 
@@ -81,7 +80,7 @@ module TestHelper
     true
   rescue Errno::ESRCH
     false
-  rescue SystemCallError => e
+  rescue SystemCallError
     true
   end
 
