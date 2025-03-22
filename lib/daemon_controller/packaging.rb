@@ -22,14 +22,6 @@
 DAEMON_CONTROLLER_FILES = [
   "README.md", "LICENSE.txt", "Rakefile", "daemon_controller.gemspec",
   "lib/**/*.rb",
-  "debian.template/**/*",
-  "rpm/**/*",
   "spec/*.rb",
   "spec/run_echo_server"
-]
-
-DAEMON_CONTROLLER_DEBIAN_EXCLUDE_FILES = [
-  "Rakefile",
-  "debian.template/**/*",
-  "rpm/**/*"
 ]
