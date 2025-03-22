@@ -986,7 +986,7 @@ class DaemonController
           "(#{e}) (process #{$$}):\n" \
           "\tfrom " +
           e.backtrace.join("\n\tfrom ")
-        $stderr.write(e)
+        $stderr.write(message)
         $stderr.flush
         exit!
       ensure
