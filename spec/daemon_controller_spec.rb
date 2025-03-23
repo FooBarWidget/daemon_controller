@@ -133,29 +133,26 @@ describe DaemonController, "#start" do
     end
   end
 
-  if Process.respond_to?(:spawn)
-    it "kills the daemon if it doesn't start in time and hasn't forked " \
-      "yet, on platforms where Ruby supports fork() or Process.spawn" do
-      new_controller(start_command: "./spec/unresponsive_daemon.rb",
-        start_timeout: 0.2)
-      pid = nil
-      expect(@controller).to receive(:daemonization_timed_out) {
-        @controller.send(:wait_until) do
-          @controller.send(:pid_file_available?)
-        end
-        pid = @controller.send(:read_pid_file)
-      }
-      block = lambda { @controller.start }
-      block.should raise_error(DaemonController::StartTimeout, /didn't daemonize in time/)
-      eventually(1) do
-        !process_is_alive?(pid)
+  it "kills the daemon if it doesn't start in time and hasn't forked yet" do
+    new_controller(start_command: "./spec/unresponsive_daemon.rb",
+      start_timeout: 0.2)
+    pid = nil
+    expect(@controller).to receive(:daemonization_timed_out) {
+      @controller.send(:wait_until) do
+        @controller.send(:pid_file_available?)
       end
-    ensure
-      begin
-        File.unlink("spec/echo_server.pid")
-      rescue
-        nil
-      end
+      pid = @controller.send(:read_pid_file)
+    }
+    block = lambda { @controller.start }
+    block.should raise_error(DaemonController::StartTimeout, /didn't daemonize in time/)
+    eventually(1) do
+      !process_is_alive?(pid)
+    end
+  ensure
+    begin
+      File.unlink("spec/echo_server.pid")
+    rescue
+      nil
     end
   end
 
@@ -231,30 +228,28 @@ describe DaemonController, "#start" do
     log.should == ["before_start", "start_command"]
   end
 
-  if Process.respond_to?(:spawn)
-    it "keeps the file descriptors in 'keep_ios' open" do
-      a, b = IO.pipe
+  it "keeps the file descriptors in 'keep_ios' open" do
+    a, b = IO.pipe
+    begin
+      new_controller(keep_ios: [b])
       begin
-        new_controller(keep_ios: [b])
-        begin
-          @controller.start
-          b.close
-          select([a], nil, nil, 0).should be_nil
-        ensure
-          @controller.stop
-        end
+        @controller.start
+        b.close
+        select([a], nil, nil, 0).should be_nil
       ensure
-        a.close if !a.closed?
-        b.close if !b.closed?
+        @controller.stop
       end
+    ensure
+      a.close if !a.closed?
+      b.close if !b.closed?
     end
+  end
 
-    it "performs the daemonization on behalf of the daemon if 'daemonize_for_me' is set" do
-      new_controller(no_daemonize: true, daemonize_for_me: true)
-      @controller.start
-      expect(ping_echo_server).to be true
-      @controller.stop
-    end
+  it "performs the daemonization on behalf of the daemon if 'daemonize_for_me' is set" do
+    new_controller(no_daemonize: true, daemonize_for_me: true)
+    @controller.start
+    expect(ping_echo_server).to be true
+    @controller.stop
   end
 
   it "receives environment variables" do

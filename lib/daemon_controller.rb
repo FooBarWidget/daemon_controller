@@ -24,9 +24,7 @@ require "fcntl"
 require "socket"
 require "pathname"
 require "timeout"
-if Process.respond_to?(:spawn)
-  require "rbconfig"
-end
+require "rbconfig"
 
 require_relative "daemon_controller/lock_file"
 
@@ -649,73 +647,59 @@ class DaemonController
     tempfile_path = tempfile.path
     tempfile.close
 
-    if Process.respond_to?(:spawn)
-      options = {
-        in: "/dev/null",
-        out: tempfile_path,
-        err: tempfile_path,
-        close_others: true
-      }
-      @keep_ios.each do |io|
-        options[io] = io
-      end
-      pid = if @daemonize_for_me
-        Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
-          command, options)
-      else
-        Process.spawn(@env, command, options)
-      end
+    options = {
+      in: "/dev/null",
+      out: tempfile_path,
+      err: tempfile_path,
+      close_others: true
+    }
+    @keep_ios.each do |io|
+      options[io] = io
+    end
+    pid = if @daemonize_for_me
+      Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
+        command, options)
+    else
+      Process.spawn(@env, command, options)
+    end
 
-      # run_command might be running in a timeout block (like
-      # in #start_without_locking).
+    # run_command might be running in a timeout block (like
+    # in #start_without_locking).
+    begin
+      interruptable_waitpid(pid)
+    rescue Errno::ECHILD
+      # Maybe a background thread or whatever waitpid()'ed
+      # this child process before we had the chance. There's
+      # no way to obtain the exit status now. Assume that
+      # it started successfully; if it didn't we'll know
+      # that later by checking the PID file and by pinging
+      # it.
+      return
+    rescue Timeout::Error
+      daemonization_timed_out
+
+      # If the daemon doesn't fork into the background
+      # in time, then kill it.
       begin
-        interruptable_waitpid(pid)
-      rescue Errno::ECHILD
-        # Maybe a background thread or whatever waitpid()'ed
-        # this child process before we had the chance. There's
-        # no way to obtain the exit status now. Assume that
-        # it started successfully; if it didn't we'll know
-        # that later by checking the PID file and by pinging
-        # it.
-        return
-      rescue Timeout::Error
-        daemonization_timed_out
-
-        # If the daemon doesn't fork into the background
-        # in time, then kill it.
-        begin
-          Process.kill("SIGTERM", pid)
+        Process.kill("SIGTERM", pid)
+      rescue SystemCallError
+      end
+      begin
+        Timeout.timeout(5, Timeout::Error) do
+          interruptable_waitpid(pid)
         rescue SystemCallError
         end
+      rescue Timeout::Error
         begin
-          Timeout.timeout(5, Timeout::Error) do
-            interruptable_waitpid(pid)
-          rescue SystemCallError
-          end
-        rescue Timeout::Error
-          begin
-            Process.kill("SIGKILL", pid)
-            interruptable_waitpid(pid)
-          rescue SystemCallError
-          end
+          Process.kill("SIGKILL", pid)
+          interruptable_waitpid(pid)
+        rescue SystemCallError
         end
-        raise DaemonizationTimeout
       end
-      if $?.exitstatus != 0
-        raise StartError, File.read(tempfile_path).strip
-      end
-    else
-      if @env && !@env.empty?
-        raise "Setting the :env option is not supported on this Ruby implementation."
-      elsif @daemonize_for_me
-        raise "Setting the :daemonize_for_me option is not supported on this Ruby implementation."
-      end
-
-      cmd = "#{command} >\"#{tempfile_path}\""
-      cmd << " 2>\"#{tempfile_path}\"" unless PLATFORM.match?(/mswin/)
-      if !system(cmd)
-        raise StartError, File.read(tempfile_path).strip
-      end
+      raise DaemonizationTimeout
+    end
+    if $?.exitstatus != 0
+      raise StartError, File.read(tempfile_path).strip
     end
   ensure
     begin
@@ -726,71 +710,59 @@ class DaemonController
   end
 
   def run_command_without_capturing_output(command)
-    if Process.respond_to?(:spawn)
-      options = {
-        in: "/dev/null",
-        out: :out,
-        err: :err,
-        close_others: true
-      }
-      @keep_ios.each do |io|
-        options[io] = io
-      end
-      pid = if @daemonize_for_me
-        Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
-          command, options)
-      else
-        Process.spawn(@env, command, options)
-      end
+    options = {
+      in: "/dev/null",
+      out: :out,
+      err: :err,
+      close_others: true
+    }
+    @keep_ios.each do |io|
+      options[io] = io
+    end
+    pid = if @daemonize_for_me
+      Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
+        command, options)
+    else
+      Process.spawn(@env, command, options)
+    end
 
-      # run_command might be running in a timeout block (like
-      # in #start_without_locking).
+    # run_command might be running in a timeout block (like
+    # in #start_without_locking).
+    begin
+      interruptable_waitpid(pid)
+    rescue Errno::ECHILD
+      # Maybe a background thread or whatever waitpid()'ed
+      # this child process before we had the chance. There's
+      # no way to obtain the exit status now. Assume that
+      # it started successfully; if it didn't we'll know
+      # that later by checking the PID file and by pinging
+      # it.
+      return
+    rescue Timeout::Error
+      daemonization_timed_out
+
+      # If the daemon doesn't fork into the background
+      # in time, then kill it.
       begin
-        interruptable_waitpid(pid)
-      rescue Errno::ECHILD
-        # Maybe a background thread or whatever waitpid()'ed
-        # this child process before we had the chance. There's
-        # no way to obtain the exit status now. Assume that
-        # it started successfully; if it didn't we'll know
-        # that later by checking the PID file and by pinging
-        # it.
-        return
-      rescue Timeout::Error
-        daemonization_timed_out
-
-        # If the daemon doesn't fork into the background
-        # in time, then kill it.
-        begin
-          Process.kill("SIGTERM", pid)
+        Process.kill("SIGTERM", pid)
+      rescue SystemCallError
+      end
+      begin
+        Timeout.timeout(5, Timeout::Error) do
+          interruptable_waitpid(pid)
         rescue SystemCallError
         end
+      rescue Timeout::Error
         begin
-          Timeout.timeout(5, Timeout::Error) do
-            interruptable_waitpid(pid)
-          rescue SystemCallError
-          end
-        rescue Timeout::Error
-          begin
-            Process.kill("SIGKILL", pid)
-            interruptable_waitpid(pid)
-          rescue SystemCallError
-          end
+          Process.kill("SIGKILL", pid)
+          interruptable_waitpid(pid)
+        rescue SystemCallError
         end
-        raise DaemonizationTimeout
       end
-      if $?.exitstatus != 0
-        raise StartError, "Daemon '#{@identifier}' failed to start."
-      end
-    else
-      if @env && !@env.empty?
-        raise "Setting the :env option is not supported on this Ruby implementation."
-      elsif @daemonize_for_me
-        raise "Setting the :daemonize_for_me option is not supported on this Ruby implementation."
-      end
-
-      if !system(command)
-        raise StartError, "Daemon '#{@identifier}' failed to start."
-      end
+      raise DaemonizationTimeout
+    end
+    if $?.exitstatus != 0
+      raise StartError, "Daemon '#{@identifier}' failed to start."
     end
   end
 
