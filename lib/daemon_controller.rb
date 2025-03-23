@@ -66,10 +66,6 @@ class DaemonController
   class DaemonizationTimeout < TimeoutError
   end
 
-  def self.fork_supported?
-    RUBY_PLATFORM != "java" && RUBY_PLATFORM !~ /win32/
-  end
-
   # Create a new DaemonController object.
   #
   # === Mandatory options
@@ -653,40 +649,21 @@ class DaemonController
     tempfile_path = tempfile.path
     tempfile.close
 
-    if self.class.fork_supported? || Process.respond_to?(:spawn)
-      if Process.respond_to?(:spawn)
-        options = {
-          in: "/dev/null",
-          out: tempfile_path,
-          err: tempfile_path,
-          close_others: true
-        }
-        @keep_ios.each do |io|
-          options[io] = io
-        end
-        pid = if @daemonize_for_me
-          Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
-            command, options)
-        else
-          Process.spawn(@env, command, options)
-        end
+    if Process.respond_to?(:spawn)
+      options = {
+        in: "/dev/null",
+        out: tempfile_path,
+        err: tempfile_path,
+        close_others: true
+      }
+      @keep_ios.each do |io|
+        options[io] = io
+      end
+      pid = if @daemonize_for_me
+        Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
+          command, options)
       else
-        pid = safe_fork(@daemonize_for_me) do
-          ObjectSpace.each_object(IO) do |obj|
-            if !@keep_ios.include?(obj)
-              begin
-                obj.close
-              rescue
-                nil
-              end
-            end
-          end
-          $stdin.reopen("/dev/null", "r")
-          $stdout.reopen(tempfile_path, "w")
-          $stderr.reopen(tempfile_path, "w")
-          ENV.update(@env)
-          exec(command)
-        end
+        Process.spawn(@env, command, options)
       end
 
       # run_command might be running in a timeout block (like
@@ -749,38 +726,21 @@ class DaemonController
   end
 
   def run_command_without_capturing_output(command)
-    if self.class.fork_supported? || Process.respond_to?(:spawn)
-      if Process.respond_to?(:spawn)
-        options = {
-          in: "/dev/null",
-          out: :out,
-          err: :err,
-          close_others: true
-        }
-        @keep_ios.each do |io|
-          options[io] = io
-        end
-        pid = if @daemonize_for_me
-          Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
-            command, options)
-        else
-          Process.spawn(@env, command, options)
-        end
+    if Process.respond_to?(:spawn)
+      options = {
+        in: "/dev/null",
+        out: :out,
+        err: :err,
+        close_others: true
+      }
+      @keep_ios.each do |io|
+        options[io] = io
+      end
+      pid = if @daemonize_for_me
+        Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
+          command, options)
       else
-        pid = safe_fork(@daemonize_for_me) do
-          ObjectSpace.each_object(IO) do |obj|
-            if !@keep_ios.include?(obj)
-              begin
-                obj.close
-              rescue
-                nil
-              end
-            end
-          end
-          $stdin.reopen("/dev/null", "r")
-          ENV.update(@env)
-          exec(command)
-        end
+        Process.spawn(@env, command, options)
       end
 
       # run_command might be running in a timeout block (like
@@ -961,42 +921,6 @@ class DaemonController
       rb_config["bindir"],
       rb_config["RUBY_INSTALL_NAME"]
     ) + rb_config["EXEEXT"]
-  end
-
-  def safe_fork(double_fork)
-    pid = fork
-    if pid.nil?
-      begin
-        if double_fork
-          pid2 = fork
-          if pid2.nil?
-            Process.setsid
-            yield
-          end
-        else
-          yield
-        end
-      rescue Exception => e # standard:disable Lint/RescueException
-        message = "*** Exception #{e.class} " \
-          "(#{e}) (process #{$$}):\n" \
-          "\tfrom " +
-          e.backtrace.join("\n\tfrom ")
-        $stderr.write(message)
-        $stderr.flush
-        exit!
-      ensure
-        exit!(0)
-      end
-    elsif double_fork
-      begin
-        Process.waitpid(pid)
-      rescue
-        nil
-      end
-      pid
-    else
-      pid
-    end
   end
 
   if RUBY_VERSION < "1.9"

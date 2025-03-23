@@ -133,7 +133,7 @@ describe DaemonController, "#start" do
     end
   end
 
-  if DaemonController.send(:fork_supported?) || Process.respond_to?(:spawn)
+  if Process.respond_to?(:spawn)
     it "kills the daemon if it doesn't start in time and hasn't forked " \
       "yet, on platforms where Ruby supports fork() or Process.spawn" do
       new_controller(start_command: "./spec/unresponsive_daemon.rb",
@@ -231,7 +231,7 @@ describe DaemonController, "#start" do
     log.should == ["before_start", "start_command"]
   end
 
-  if DaemonController.send(:fork_supported?) || Process.respond_to?(:spawn)
+  if Process.respond_to?(:spawn)
     it "keeps the file descriptors in 'keep_ios' open" do
       a, b = IO.pipe
       begin
