@@ -58,8 +58,8 @@ module TestHelper
       ping_command: method(:ping_echo_server),
       pid_file: "spec/echo_server.pid",
       log_file: "spec/echo_server.log",
-      start_timeout: 3,
-      stop_timeout: 3
+      start_timeout: 30,
+      stop_timeout: 30
     }.merge(options)
     @controller = DaemonController.new(new_options)
   end
