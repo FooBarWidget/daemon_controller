@@ -70,11 +70,6 @@ class DaemonController
     RUBY_PLATFORM != "java" && RUBY_PLATFORM !~ /win32/
   end
 
-  def self.spawn_supported?
-    # Process.spawn doesn't work very well in JRuby.
-    Process.respond_to?(:spawn) && RUBY_PLATFORM != "java"
-  end
-
   # Create a new DaemonController object.
   #
   # === Mandatory options
@@ -658,7 +653,7 @@ class DaemonController
     tempfile_path = tempfile.path
     tempfile.close
 
-    if self.class.fork_supported? || self.class.spawn_supported?
+    if self.class.fork_supported? || Process.respond_to?(:spawn)
       if Process.respond_to?(:spawn)
         options = {
           in: "/dev/null",
@@ -754,7 +749,7 @@ class DaemonController
   end
 
   def run_command_without_capturing_output(command)
-    if self.class.fork_supported? || self.class.spawn_supported?
+    if self.class.fork_supported? || Process.respond_to?(:spawn)
       if Process.respond_to?(:spawn)
         options = {
           in: "/dev/null",
