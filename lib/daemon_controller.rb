@@ -923,22 +923,16 @@ class DaemonController
     ) + rb_config["EXEEXT"]
   end
 
-  if RUBY_VERSION < "1.9"
-    def interruptable_waitpid(pid)
-      Process.waitpid(pid)
+  # Thread#kill (which is called by timeout.rb) may
+  # not be able to interrupt Process.waitpid. So here we use a
+  # special version that's a bit less efficient but is at least
+  # interruptable.
+  def interruptable_waitpid(pid)
+    result = nil
+    until result
+      result = Process.waitpid(pid, Process::WNOHANG)
+      sleep 0.01 if !result
     end
-  else
-    # On Ruby 1.9, Thread#kill (which is called by timeout.rb) may
-    # not be able to interrupt Process.waitpid. So here we use a
-    # special version that's a bit less efficient but is at least
-    # interruptable.
-    def interruptable_waitpid(pid)
-      result = nil
-      until result
-        result = Process.waitpid(pid, Process::WNOHANG)
-        sleep 0.01 if !result
-      end
-      result
-    end
+    result
   end
 end
