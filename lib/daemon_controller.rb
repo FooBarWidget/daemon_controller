@@ -75,160 +75,165 @@ class DaemonController
 
   # Create a new DaemonController object.
   #
-  # === Mandatory options
+  # ## Mandatory options
   #
-  # [:identifier]
-  #  A human-readable, unique name for this daemon, e.g. "Sphinx search server".
-  #  This identifier will be used in some error messages. On some platforms, it will
-  #  be used for concurrency control: on such platforms, no two DaemonController
-  #  objects will operate on the same identifier on the same time.
+  # ### identifier
   #
-  # [:start_command]
-  #  The command to start the daemon. This must be a a String, e.g.
-  #  "mongrel_rails start -e production", or a Proc which returns a String.
+  # Human-readable, unique name for this daemon, e.g. "Sphinx search server".
+  # This identifier will be used in some error messages. On some platforms, it will
+  # be used for concurrency control: on such platforms, no two DaemonController
+  # objects will operate on the same identifier on the same time.
   #
-  #  If the value is a Proc, and the +before_start+ option is given too, then
-  #  the +start_command+ Proc is guaranteed to be called after the +before_start+
-  #  Proc is called.
+  # ### start_command
   #
-  # [:ping_command]
-  #  The ping command is used to check whether the daemon can be connected to.
-  #  It is also used to ensure that #start only returns when the daemon can be
-  #  connected to.
+  # Command to start the daemon. This must be a a String, e.g.
+  # "mongrel_rails start -e production", or a Proc which returns a String.
   #
-  #  The value may be a command string. This command must exit with an exit code of
-  #  0 if the daemon can be successfully connected to, or exit with a non-0 exit
-  #  code on failure.
+  # If the value is a Proc, and the `before_start` option is given too, then
+  # the `start_command` Proc is guaranteed to be called after the `before_start`
+  # Proc is called.
   #
-  #  The value may also be an Array which specifies the socket address of the daemon.
-  #  It must be in one of the following forms:
-  #  - [:tcp, host_name, port]
-  #  - [:unix, filename]
+  # ### ping_command
   #
-  #  The value may also be a Proc, which returns an expression that evaluates to
-  #  true (indicating that the daemon can be connected to) or false (failure).
-  #  If the Proc raises Errno::ECONNREFUSED, Errno::ENETUNREACH, Errno::ETIMEDOUT
-  #  Errno::ECONNRESET, Errno::EINVAL or Errno::EADDRNOTAVAIL then that also
-  #  means that the daemon cannot be connected to.
-  #  <b>NOTE:</b> if the ping command returns an object which responds to
-  #  <tt>#close</tt>, then that method will be called on it.
-  #  This makes it possible to specify a ping command such as
-  #  <tt>lambda { TCPSocket.new('localhost', 1234) }</tt>, without having to worry
-  #  about closing it afterwards.
-  #  Any exceptions raised by #close are ignored.
+  # Command used to check whether the daemon can be connected to.
+  # It is also used to ensure that #start only returns when the daemon can be
+  # connected to.
   #
-  # [:pid_file]
-  #  The PID file that the daemon will write to. Used to check whether the daemon
-  #  is running.
+  # Value may be a command string. This command must exit with an exit code of
+  # 0 if the daemon can be successfully connected to, or exit with a non-0 exit
+  # code on failure.
   #
-  # [:lock_file]
-  #  The lock file to use for serializing concurrent daemon management operations.
-  #  Defaults to "(filename of PID file).lock".
+  # Value may also be an Array which specifies the socket address of the daemon.
+  # It must be in one of the following forms:
+  # - `[:tcp, host_name, port]`
+  # - `[:unix, filename]`
   #
-  # [:log_file]
-  #  The log file that the daemon will write to. It will be consulted to see
-  #  whether the daemon has printed any error messages during startup.
+  # Value may also be a Proc, which returns an expression that evaluates to
+  # true (indicating that the daemon can be connected to) or false (failure).
+  # If the Proc raises Errno::ECONNREFUSED, Errno::ENETUNREACH, Errno::ETIMEDOUT
+  # Errno::ECONNRESET, Errno::EINVAL or Errno::EADDRNOTAVAIL then that also
+  # means that the daemon cannot be connected to.
+  # **NOTE:** if the ping command returns an object which responds to
+  # `#close`, then that method will be called on it.
+  # This makes it possible to specify a ping command such as
+  # `lambda { TCPSocket.new('localhost', 1234) }`, without having to worry
+  # about closing it afterwards.
+  # Any exceptions raised by #close are ignored.
   #
-  # === Optional options
-  # [:stop_command]
-  #  A command to stop the daemon with, e.g. "/etc/rc.d/nginx stop". If no stop
-  #  command is given (i.e. +nil+), then DaemonController will stop the daemon
-  #  by killing the PID written in the PID file.
+  # ### pid_file
   #
-  #  The default value is +nil+.
+  # PID file that the daemon will write to. Used to check whether the daemon
+  # is running.
   #
-  # [:restart_command]
-  #  A command to restart the daemon with, e.g. "/etc/rc.d/nginx restart". If
-  #  no restart command is given (i.e. +nil+), then DaemonController will
-  #  restart the daemon by calling #stop and #start.
+  # ### log_file
   #
-  #  The default value is +nil+.
+  # Log file that the daemon will write to. It will be consulted to see
+  # whether the daemon has printed any error messages during startup.
   #
-  # [:before_start]
-  #  This may be a Proc. It will be called just before running the start command.
-  #  The before_start proc is not subject to the start timeout.
+  # ## Optional options
   #
-  # [:start_timeout]
-  #  The maximum amount of time, in seconds, that #start may take to start
-  #  the daemon. Since #start also waits until the daemon can be connected to,
-  #  that wait time is counted as well. If the daemon does not start in time,
-  #  then #start will raise an exception.
+  # ### lock_file (default: "(filename of PID file).lock")
   #
-  #  The default value is 15.
+  # Lock file to use for serializing concurrent daemon management operations.
   #
-  # [:stop_timeout]
-  #  The maximum amount of time, in seconds, that #stop may take to stop
-  #  the daemon. Since #stop also waits until the daemon is no longer running,
-  #  that wait time is counted as well. If the daemon does not stop in time,
-  #  then #stop will raise an exception.
+  # ### stop_command (default: nil)
   #
-  #  The default value is 15.
+  # Command to stop the daemon with, e.g. "/etc/rc.d/nginx stop". If no stop
+  # command is given (i.e. `nil`), then DaemonController will stop the daemon
+  # by killing the PID written in the PID file.
   #
-  # [:log_file_activity_timeout]
-  #  Once a daemon has gone into the background, it will become difficult to
-  #  know for certain whether it is still initializing or whether it has
-  #  failed and exited, until it has written its PID file. Suppose that it
-  #  failed with an error after daemonizing but before it has written its PID file;
-  #  not many system administrators want to wait 15 seconds (the default start
-  #  timeout) to be notified of whether the daemon has terminated with an error.
+  # ### restart_command (default: nil)
   #
-  #  An alternative way to check whether the daemon has terminated with an error,
-  #  is by checking whether its log file has been recently updated. If, after the
-  #  daemon has started, the log file hasn't been updated for the amount of seconds
-  #  given by the :log_file_activity_timeout option, then the daemon is assumed to
-  #  have terminated with an error.
+  # Command to restart the daemon with, e.g. "/etc/rc.d/nginx restart". If
+  # no restart command is given (i.e. `nil`), then DaemonController will
+  # restart the daemon by calling #stop and #start.
   #
-  #  The default value is 7.
+  # ### before_start (default: nil)
   #
-  # [:dont_stop_if_pid_file_invalid]
-  #  If the :stop_command option is given, then normally daemon_controller will
-  #  always execute this command upon calling #stop. But if :dont_stop_if_pid_file_invalid
-  #  is given, then daemon_controller will not do that if the PID file does not contain
-  #  a valid number.
+  # This may be a Proc. It will be called just before running the start command.
+  # The Proc call is not subject to the start timeout.
   #
-  #  The default is false.
+  # ### start_timeout (default: 30)
   #
-  # [:daemonize_for_me]
-  #  Normally daemon_controller will wait until the daemon has daemonized into the
-  #  background, in order to capture any errors that it may print on stdout or
-  #  stderr before daemonizing. However, if the daemon doesn't support daemonization
-  #  for some reason, then setting this option to true will cause daemon_controller
-  #  to do the daemonization for the daemon.
+  # Maximum amount of time (seconds) that #start may take to start
+  # the daemon. Since #start also waits until the daemon can be connected to,
+  # that wait time is counted as well. If the daemon does not start in time,
+  # then #start will raise an exception.
   #
-  #  The default is false.
+  # ### stop_timeout (default: 30)
   #
-  # [:keep_ios]
-  #  Upon spawning the daemon, daemon_controller will normally close all file
-  #  descriptors except stdin, stdout and stderr. However if there are any file
-  #  descriptors you want to keep open, specify the IO objects here. This must be
-  #  an array of IO objects.
+  # Maximum amount of time (seconds) that #stop may take to stop
+  # the daemon. Since #stop also waits until the daemon is no longer running,
+  # that wait time is counted as well. If the daemon does not stop in time,
+  # then #stop will raise an exception.
   #
-  # [:env]
-  #  This must be a Hash.  The hash will contain the environment variables available
-  #  to be made available to the daemon. Hash keys must be strings, not symbols.
-  def initialize(options)
-    [:identifier, :start_command, :ping_command, :pid_file, :log_file].each do |option|
-      if !options.has_key?(option)
-        raise ArgumentError, "The ':#{option}' option is mandatory"
-      end
-    end
-    @identifier = options[:identifier]
-    @start_command = options[:start_command]
-    @stop_command = options[:stop_command]
-    @ping_command = options[:ping_command]
-    @restart_command = options[:restart_command]
-    @ping_interval = options[:ping_interval] || 0.1
-    @pid_file = options[:pid_file]
-    @log_file = options[:log_file]
-    @before_start = options[:before_start]
-    @start_timeout = options[:start_timeout] || 15
-    @stop_timeout = options[:stop_timeout] || 15
-    @log_file_activity_timeout = options[:log_file_activity_timeout] || 7
-    @dont_stop_if_pid_file_invalid = options[:dont_stop_if_pid_file_invalid]
-    @daemonize_for_me = options[:daemonize_for_me]
-    @keep_ios = options[:keep_ios] || []
-    @lock_file = determine_lock_file(options, @identifier, @pid_file)
-    @env = options[:env] || {}
+  # ### log_file_activity_timeout (default: 10)
+  #
+  # Once a daemon has gone into the background, it will become difficult to
+  # know for certain whether it is still initializing or whether it has
+  # failed and exited, until it has written its PID file. Suppose that it
+  # failed with an error after daemonizing but before it has written its PID file;
+  # not many system administrators want to wait 30 seconds (the default start
+  # timeout) to be notified of whether the daemon has terminated with an error.
+  #
+  # An alternative way to check whether the daemon has terminated with an error,
+  # is by checking whether its log file has been recently updated. If, after the
+  # daemon has started, the log file hasn't been updated for the amount of seconds
+  # given by this option, then the daemon is assumed to have terminated with an error.
+  #
+  # ### ping_interval (default: 0.1)
+  #
+  # Time interval (seconds) between pinging attempts (see `ping_command`) when waiting
+  # for the daemon to start.
+  #
+  # ### dont_stop_if_pid_file_invalid (default: false)
+  #
+  # If the stop_command option is given, then normally daemon_controller will
+  # always execute this command upon calling #stop. But if dont_stop_if_pid_file_invalid
+  # is given, then daemon_controller will not do that if the PID file does not contain
+  # a valid number.
+  #
+  # ### daemonize_for_me (default: false)
+  #
+  # Normally daemon_controller will wait until the daemon has daemonized into the
+  # background, in order to capture any errors that it may print on stdout or
+  # stderr before daemonizing. However, if the daemon doesn't support daemonization
+  # for some reason, then setting this option to true will cause daemon_controller
+  # to do the daemonization for the daemon.
+  #
+  # ### keep_ios (default: nil)
+  #
+  # Upon spawning the daemon, daemon_controller will normally close all file
+  # descriptors except stdin, stdout and stderr. However if there are any file
+  # descriptors you want to keep open, specify the IO objects here. This must be
+  # an array of IO objects.
+  #
+  # ### env (default: nil)
+  #
+  # This must be a Hash. The hash will contain the environment variables available
+  # to be made available to the daemon. Hash keys must be Strings, not Symbols.
+  def initialize(identifier:, start_command:, ping_command:, pid_file:, log_file:,
+    lock_file: nil, stop_command: nil, restart_command: nil, before_start: nil,
+    start_timeout: 30, stop_timeout: 30, log_file_activity_timeout: 10, ping_interval: 0.1,
+    dont_stop_if_pid_file_invalid: false, daemonize_for_me: false, keep_ios: nil, env: nil)
+    @identifier = identifier
+    @start_command = start_command
+    @ping_command = ping_command
+    @pid_file = pid_file
+    @log_file = log_file
+
+    @lock_file = determine_lock_file(lock_file, identifier, pid_file)
+    @stop_command = stop_command
+    @restart_command = restart_command
+    @before_start = before_start
+    @start_timeout = start_timeout
+    @stop_timeout = stop_timeout
+    @log_file_activity_timeout = log_file_activity_timeout
+    @ping_interval = ping_interval
+    @dont_stop_if_pid_file_invalid = dont_stop_if_pid_file_invalid
+    @daemonize_for_me = daemonize_for_me
+    @keep_ios = keep_ios
+    @env = env
   end
 
   # Start the daemon and wait until it can be pinged.
@@ -604,9 +609,9 @@ class DaemonController
     nil
   end
 
-  def determine_lock_file(options, identifier, pid_file)
-    if options[:lock_file]
-      LockFile.new(File.absolute_path(options[:lock_file]))
+  def determine_lock_file(given_lock_file, identifier, pid_file)
+    if given_lock_file
+      LockFile.new(File.absolute_path(given_lock_file))
     else
       LockFile.new(File.absolute_path(pid_file + ".lock"))
     end
@@ -658,14 +663,16 @@ class DaemonController
       err: tempfile_path,
       close_others: true
     }
-    @keep_ios.each do |io|
-      options[io] = io
+    if @keep_ios
+      @keep_ios.each do |io|
+        options[io] = io
+      end
     end
     pid = if @daemonize_for_me
-      Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
+      Process.spawn(@env || {}, ruby_interpreter, SPAWNER_FILE,
         command, options)
     else
-      Process.spawn(@env, command, options)
+      Process.spawn(@env || {}, command, options)
     end
 
     # run_command might be running in a timeout block (like
@@ -725,14 +732,16 @@ class DaemonController
       err: :err,
       close_others: true
     }
-    @keep_ios.each do |io|
-      options[io] = io
+    if @keep_ios
+      @keep_ios.each do |io|
+        options[io] = io
+      end
     end
     pid = if @daemonize_for_me
-      Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
+      Process.spawn(@env || {}, ruby_interpreter, SPAWNER_FILE,
         command, options)
     else
-      Process.spawn(@env, command, options)
+      Process.spawn(@env || {}, command, options)
     end
 
     # run_command might be running in a timeout block (like

@@ -41,31 +41,31 @@ end
 module TestHelper
   def new_controller(options = {})
     @start_command = String.new("./spec/run_echo_server -l spec/echo_server.log")
-    if options[:log_message1]
-      @start_command << " --log-message1 #{Shellwords.escape options[:log_message1]}"
+    if (log_message1 = options.delete(:log_message1))
+      @start_command << " --log-message1 #{Shellwords.escape log_message1}"
     end
-    if options[:log_message2]
-      @start_command << " --log-message2 #{Shellwords.escape options[:log_message2]}"
+    if (log_message2 = options.delete(:log_message2))
+      @start_command << " --log-message2 #{Shellwords.escape log_message2}"
     end
-    if options[:wait1]
-      @start_command << " --wait1 #{options[:wait1]}"
+    if (wait1 = options.delete(:wait1))
+      @start_command << " --wait1 #{wait1}"
     end
-    if options[:wait2]
-      @start_command << " --wait2 #{options[:wait2]}"
+    if (wait2 = options.delete(:wait2))
+      @start_command << " --wait2 #{wait2}"
     end
-    if options[:stop_time]
-      @start_command << " --stop-time #{options[:stop_time]}"
+    if (stop_time = options.delete(:stop_time))
+      @start_command << " --stop-time #{stop_time}"
     end
-    if options[:crash_before_bind]
+    if options.delete(:crash_before_bind)
       @start_command << " --crash-before-bind"
     end
-    if options[:crash_signal]
-      @start_command << " --crash-signal #{options[:crash_signal]}"
+    if (crash_signal = options.delete(:crash_signal))
+      @start_command << " --crash-signal #{crash_signal}"
     end
-    if options[:no_daemonize]
+    if options.delete(:no_daemonize)
       @start_command << " --no-daemonize"
     end
-    if !options[:no_write_pid_file]
+    if !options.delete(:no_write_pid_file)
       @start_command << " -P spec/echo_server.pid"
     end
     new_options = {
@@ -77,7 +77,7 @@ module TestHelper
       start_timeout: 30,
       stop_timeout: 30
     }.merge(options)
-    @controller = DaemonController.new(new_options)
+    @controller = DaemonController.new(**new_options)
   end
 
   def ping_echo_server
