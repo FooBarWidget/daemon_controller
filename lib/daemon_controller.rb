@@ -49,32 +49,9 @@ class DaemonController
   end
 
   class StartError < Error
-    attr_reader :logs
-
-    def initialize(logs)
-      if logs.nil?
-        super("(logs not available)")
-      elsif logs.empty?
-        super("(logs empty)")
-      else
-        super
-      end
-      @logs = logs
-    end
   end
 
   class StartTimeout < TimeoutError
-    attr_reader :logs
-
-    def initialize(logs)
-      if logs.nil?
-        super("(logs not available; timed out)")
-      elsif logs.empty?
-        super("(logs empty; timed out)")
-      else
-        super("#{logs} (timed out)")
-      end
-    end
   end
 
   class StopError < Error
@@ -88,6 +65,12 @@ class DaemonController
 
   # Internal, not publicly thrown.
   class DaemonizationTimeout < TimeoutError
+    attr_reader :output
+
+    def initialize(output)
+      super()
+      @output = output
+    end
   end
 
   # Create a new DaemonController object.
@@ -437,11 +420,11 @@ class DaemonController
     end
 
     if !result
-      raise StartError, differences_in_log_file
+      raise StartError, concat_spawn_output_and_logs(@spawn_output, differences_in_log_file)
     elsif result == :daemonization_timeout
-      raise StartTimeout, differences_in_log_file
+      raise StartTimeout, concat_spawn_output_and_logs(@spawn_output, differences_in_log_file, nil, "timed out")
     elsif result == :start_timeout
-      raise StartTimeout, differences_in_log_file
+      raise StartTimeout, concat_spawn_output_and_logs(@spawn_output, differences_in_log_file, nil, "timed out")
     else
       true
     end
@@ -454,11 +437,14 @@ class DaemonController
   end
 
   def spawn_daemon
-    if @start_command.respond_to?(:call)
+    @spawn_output = if @start_command.respond_to?(:call)
       run_command(@start_command.call)
     else
       run_command(@start_command)
     end
+  rescue DaemonizationTimeout => e
+    @spawn_output = e.output
+    raise e
   end
 
   def kill_daemon
@@ -715,10 +701,14 @@ class DaemonController
         rescue SystemCallError
         end
       end
-      raise DaemonizationTimeout
+      raise DaemonizationTimeout, File.read(tempfile_path).strip
     end
+
+    output = File.read(tempfile_path).strip
     if $?.exitstatus != 0
-      raise StartError, File.read(tempfile_path).strip
+      raise StartError, concat_spawn_output_and_logs(output, differences_in_log_file, $?)
+    else
+      output
     end
   ensure
     begin
@@ -778,10 +768,10 @@ class DaemonController
         rescue SystemCallError
         end
       end
-      raise DaemonizationTimeout
+      raise DaemonizationTimeout, nil
     end
     if $?.exitstatus != 0
-      raise StartError, "Daemon '#{@identifier}' failed to start"
+      raise StartError, concat_spawn_output_and_logs(nil, differences_in_log_file, $?)
     end
   end
 
@@ -925,5 +915,49 @@ class DaemonController
       sleep 0.01 if !result
     end
     result
+  end
+
+  def signal_termination_message(process_status)
+    if process_status.signaled?
+      "terminated with signal #{signal_name_for(process_status.termsig)}"
+    else
+      "exited with status #{process_status.exitstatus}"
+    end
+  end
+
+  def signal_name_for(num)
+    if (name = Signal.list.find { |name, n| n == num }[0])
+      "SIG#{name}"
+    else
+      num.to_s
+    end
+  end
+
+  def concat_spawn_output_and_logs(output, logs, exit_status = nil, suffix_message = nil)
+    if output.nil? && logs.nil?
+      result_inner = [
+        "logs not available",
+        exit_status ? signal_termination_message(exit_status) : nil,
+        suffix_message
+      ].compact.join("; ")
+      "(#{result_inner})"
+    elsif (output && output.empty? && logs && logs.empty?) || (output && output.empty? && logs.nil?) || (output.nil? && logs && logs.empty?)
+      result_inner = [
+        "logs empty",
+        exit_status ? signal_termination_message(exit_status) : nil,
+        suffix_message
+      ].compact.join("; ")
+      "(#{result_inner})"
+    else
+      result = ((output || "") + "\n" + (logs || "")).strip
+      result_suffix = [
+        exit_status ? signal_termination_message(exit_status) : nil,
+        suffix_message
+      ].compact.join("; ")
+      if !result_suffix.empty?
+        result << "\n(#{result_suffix})"
+      end
+      result
+    end
   end
 end

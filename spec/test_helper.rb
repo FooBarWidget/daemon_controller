@@ -40,9 +40,12 @@ end
 
 module TestHelper
   def new_controller(options = {})
-    @start_command = String.new("./spec/run_echo_server -l spec/echo_server.log -P spec/echo_server.pid")
-    if options[:log_message]
-      @start_command << " --log-message #{Shellwords.escape options[:log_message]}"
+    @start_command = String.new("./spec/run_echo_server -l spec/echo_server.log")
+    if options[:log_message1]
+      @start_command << " --log-message1 #{Shellwords.escape options[:log_message1]}"
+    end
+    if options[:log_message2]
+      @start_command << " --log-message2 #{Shellwords.escape options[:log_message2]}"
     end
     if options[:wait1]
       @start_command << " --wait1 #{options[:wait1]}"
@@ -56,8 +59,14 @@ module TestHelper
     if options[:crash_before_bind]
       @start_command << " --crash-before-bind"
     end
+    if options[:crash_signal]
+      @start_command << " --crash-signal #{options[:crash_signal]}"
+    end
     if options[:no_daemonize]
       @start_command << " --no-daemonize"
+    end
+    if !options[:no_write_pid_file]
+      @start_command << " -P spec/echo_server.pid"
     end
     new_options = {
       identifier: "My Test Daemon",

@@ -31,8 +31,11 @@ parser = OptionParser.new do |opts|
   opts.on("-P", "--pid-file FILENAME", String, "Pid file to use.") do |value|
     options[:pid_file] = File.absolute_path(value)
   end
-  opts.on("--log-message MESSAGE", String, "Log message before writing pid file.") do |value|
-    options[:log_message] = value
+  opts.on("--log-message1 MESSAGE", String, "Log message before opening log file.") do |value|
+    options[:log_message1] = value
+  end
+  opts.on("--log-message2 MESSAGE", String, "Log message after opening log file.") do |value|
+    options[:log_message2] = value
   end
   opts.on("--wait1 SECONDS", Float, "Wait a few seconds before writing pid file.") do |value|
     options[:wait1] = value
@@ -45,6 +48,9 @@ parser = OptionParser.new do |opts|
   end
   opts.on("--crash-before-bind", "Whether the daemon should crash before binding the server socket.") do
     options[:crash_before_bind] = true
+  end
+  opts.on("--crash-signal SIGNAL", "Signal to send to the daemon when crashing.") do |value|
+    options[:crash_signal] = value
   end
   opts.on("--no-daemonize", "Don't daemonize.") do
     options[:daemonize] = false
@@ -66,6 +72,11 @@ if options[:pid_file]
   end
 end
 
+if options[:log_message1]
+  puts options[:log_message1]
+  $stdout.flush
+end
+
 if ENV["ENV_FILE"]
   options[:env_file] = File.absolute_path(ENV["ENV_FILE"])
 end
@@ -79,8 +90,8 @@ def main(options)
   Dir.chdir(options[:chdir])
   File.umask(0)
 
-  if options[:log_message]
-    puts options[:log_message]
+  if options[:log_message2]
+    puts options[:log_message2]
   end
 
   if options[:env_file]
@@ -97,16 +108,14 @@ def main(options)
     File.open(options[:pid_file], "w") do |f|
       f.puts(Process.pid)
     end
-    at_exit do
-      File.unlink(options[:pid_file])
-    rescue
-      nil
-    end
   end
 
   sleep(options[:wait2])
   if options[:crash_before_bind]
     puts "#{Time.now}: crashing, as instructed."
+    if options[:crash_signal]
+      Process.kill(options[:crash_signal], Process.pid)
+    end
     exit 2
   end
 
