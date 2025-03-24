@@ -31,12 +31,6 @@ It provides the following functionality:
 gem install daemon_controller
 ```
 
-## Resources
-
-*   [Website](https://github.com/FooBarWidget/daemon_controller)
-*   [RDoc](http://rdoc.info/projects/FooBarWidget/daemon_controller)
-*   [Git repository](git://github.com/FooBarWidget/daemon_controller.git)
-
 
 What is it for?
 ===============
@@ -87,13 +81,15 @@ daemon varies. We've observed that waiting a fixed amount of time is by far the
 most common way. For example, UltraSphinx's daemon starting code looks like
 this:
 
-    system "searchd --config '#{Ultrasphinx::CONF_PATH}'"
-    sleep(4) # give daemon a chance to write the pid file
-    if ultrasphinx_daemon_running?
-       say "started successfully"
-    else
-       say "failed to start"
-    end
+```ruby
+system "searchd --config '#{Ultrasphinx::CONF_PATH}'"
+sleep(4) # give daemon a chance to write the pid file
+if ultrasphinx_daemon_running?
+  say "started successfully"
+else
+  say "failed to start"
+end
+```
 
 This is in no way a slam against UltraSphinx. However, if the daemon starts in
 200 miliseconds, then the user who issued the start command will be waiting for
@@ -291,7 +287,7 @@ without having to start the daemons manually.
 Tutorial #1: controlling Apache
 ===============================
 
-Suppose that you're a [Phusion Passenger](http://www.modrails.com/) developer,
+Suppose that you're a [Phusion Passenger](https://www.phusionpasseenger.com/) developer,
 and you need to write tests for the Apache module. In particular, you want to
 test whether the different Phusion Passenger configuration directives are
 working as expected. Obviously, to test the Apache module, the Apache web
@@ -306,29 +302,30 @@ server must be running. For every test, you will want the unit test suite to:
 
 That can be done with the following code:
 
-    require 'daemon_controller'
+```ruby
+require "daemon_controller"
 
-    File.open("apache.conf", "w") do |f|
-       f.write("PidFile apache.pid\n")
-       f.write("LogFile apache.log\n")
-       f.write("Listen 1234\n")
-       f.write(... other relevant configuration options ...)
-    end
+File.open("apache.conf", "w") do |f|
+  f.write("PidFile apache.pid\n")
+  f.write("LogFile apache.log\n")
+  f.write("Listen 1234\n")
+  f.write(... other relevant configuration options ...)
+end
 
-    controller = DaemonController.new(
-       :identifier    => 'Apache web server',
-       :start_command => 'apachectl -f apache.conf -k start',
-       :ping_command  => [:tcp, 'localhost', 1234],
-       :pid_file      => 'apache.pid',
-       :log_file      => 'apache.log',
-       :start_timeout => 25
-    )
-    controller.start
+controller = DaemonController.new(
+  identifier: "Apache web server",
+  start_command: "apachectl -f apache.conf -k start",
+  ping_command: [:tcp, "localhost", 1234],
+  pid_file: "apache.pid",
+  log_file: "apache.log"
+)
+controller.start
 
-    .... apache is now started ....
-    .... some test code here ....
+# .... apache is now started ....
+# .... some test code here ....
 
-    controller.stop
+controller.stop
+```
 
 The `File.open` line is obvious: it writes the relevant Apache configuration
 file.
@@ -336,8 +333,8 @@ file.
 The next line is for creating a new DaemonController object. We pass a
 human-readable identifier for this daemon ("Apache web server") to the
 constructor. This is used for generating friendlier error messages.
-We also tell it how Apache is supposed to be started (`:start_command`), how to
-check whether it can be connected to (`:ping_command`), and where its PID file
+We also tell it how Apache is supposed to be started (`start_command:`), how to
+check whether it can be connected to (`ping_command:`), and where its PID file
 and log file is. If Apache failed with an error during startup, then it will be
 reported. If Apache failed with an error after it has gone into the background,
 then that will be reported too: the given log file is monitored for new error
@@ -345,7 +342,8 @@ messages.
 Finally, a timeout of 25 seconds is given. If Apache doesn't start within 25
 seconds, then an exception will be raised.
 
-The ping command is just a `Proc` which returns true or false. If the Proc
+The ping command specifies which socket to connect to in order to check whether
+the daemon is ready. It can also be a `Proc` which returns true or false. If the Proc
 raises `Errno::ECONNREFUSED`, then that's also interpreted by DaemonController
 as meaning that the daemon isn't responding yet.
 
@@ -392,41 +390,43 @@ isn't running.
 
 This can be achieved with the following code:
 
-    require 'daemon_controller'
+```ruby
+require "daemon_controller"
 
-    class SearchServer
-       SEARCH_SERVER_PORT = 1234
+class SearchServer
+  SEARCH_SERVER_PORT = 1234
 
-       def initialize
-          @controller = DaemonController.new(
-             :identifier => 'Sphinx search server',
-             :start_command => "searchd -c config/sphinx.conf",
-             :before_start => method(:before_start),
-             :ping_command => [:tcp, 'localhost', SEARCH_SERVER_PORT],
-             :pid_file => 'tmp/pids/sphinx.pid',
-             :log_file => 'log/sphinx.log')
-       end
+  def initialize
+    @controller = DaemonController.new(
+      identifier: "Sphinx search server",
+      start_command: "searchd -c config/sphinx.conf",
+      before_start: method(:before_start),
+      ping_command: [:tcp, "localhost", SEARCH_SERVER_PORT],
+      pid_file: "tmp/pids/sphinx.pid",
+      log_file: "log/sphinx.log")
+  end
 
-       def query(search_terms)
-          socket = @controller.connect do
-             TCPSocket.new('localhost', SEARCH_SERVER_PORT)
-          end
-          send_query(socket, search_terms)
-          return retrieve_results(socket)
-       end
-
-    private
-       def before_start
-          generate_configuration_file
-          if !index_exists?
-             generate_index
-          end
-       end
-
-       ...
+  def query(search_terms)
+    socket = @controller.connect do
+      TCPSocket.new("localhost", SEARCH_SERVER_PORT)
     end
+    send_query(socket, search_terms)
+    retrieve_results(socket)
+  end
 
-Notice the `:before_start` option. We pass a block of code which is to be run,
+private
+  def before_start
+    generate_configuration_file
+    if !index_exists?
+      generate_index
+    end
+  end
+
+  # ...
+end
+```
+
+Notice the `before_start:` option. We pass a block of code which is to be run,
 just before the daemon is started. This block, along with starting the daemon,
 is completely serialized. That is, if you're inside the block, then it's
 guaranteed that no other process is running this block at the same time as well.
