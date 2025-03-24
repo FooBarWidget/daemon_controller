@@ -200,7 +200,7 @@ class DaemonController
   def initialize(options)
     [:identifier, :start_command, :ping_command, :pid_file, :log_file].each do |option|
       if !options.has_key?(option)
-        raise ArgumentError, "The ':#{option}' option is mandatory."
+        raise ArgumentError, "The ':#{option}' option is mandatory"
       end
     end
     @identifier = options[:identifier]
@@ -411,13 +411,13 @@ class DaemonController
     end
     if !result
       raise(StartError, differences_in_log_file ||
-        "Daemon '#{@identifier}' failed to start.")
+        "Daemon '#{@identifier}' failed to start")
     elsif result == :daemonization_timeout
       raise(StartTimeout, differences_in_log_file ||
-        "Daemon '#{@identifier}' didn't daemonize in time.")
+        "Daemon '#{@identifier}' didn't daemonize in time")
     elsif result == :start_timeout
       raise(StartTimeout, differences_in_log_file ||
-        "Daemon '#{@identifier}' failed to start in time.")
+        "Daemon '#{@identifier}' failed to start in time")
     else
       true
     end
@@ -762,7 +762,7 @@ class DaemonController
       raise DaemonizationTimeout
     end
     if $?.exitstatus != 0
-      raise StartError, "Daemon '#{@identifier}' failed to start."
+      raise StartError, "Daemon '#{@identifier}' failed to start"
     end
   end
 
