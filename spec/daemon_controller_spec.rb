@@ -162,7 +162,7 @@ describe DaemonController, "#start" do
   end
 
   it "raises an error if the daemon exits with an error after forking" do
-    new_controller(crash_before_bind: true, log_file_activity_timeout: 0.2)
+    new_controller(crash_before_bind: true, log_file_activity_timeout: 0.5)
     expect { @controller.start }.to raise_error(DaemonController::Error)
   end
 
@@ -176,7 +176,7 @@ describe DaemonController, "#start" do
   end
 
   specify "the daemon's error output after forking is made available in the exception" do
-    new_controller(crash_before_bind: true, log_file_activity_timeout: 0.1)
+    new_controller(crash_before_bind: true, log_file_activity_timeout: 0.5)
     begin
       @controller.start
       violated
@@ -187,7 +187,7 @@ describe DaemonController, "#start" do
 
   specify "the daemon's error output is not available if the log file is not a regular file" do
     new_controller(crash_before_bind: true,
-      log_file_activity_timeout: 0.1,
+      log_file_activity_timeout: 0.5,
       log_file: "/dev/stderr")
     begin
       @controller.start
