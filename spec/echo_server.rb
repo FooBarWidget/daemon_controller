@@ -1,4 +1,6 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
+
 # A simple echo server, used by the unit test.
 require "socket"
 require "optparse"
@@ -125,7 +127,7 @@ def main(options)
     exit 2
   rescue => e
     puts e
-    puts "    " << e.backtrace.join("\n    ")
+    puts "    " + e.backtrace.join("\n    ")
     exit 3
   ensure
     puts "*** #{Time.now}: echo server exiting..."

@@ -3,3 +3,4 @@ ignore:
       - Style/InfiniteLoop
       - Style/SafeNavigation
       - Style/FileNull
+      - Performance/UnfreezeString

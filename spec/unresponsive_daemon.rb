@@ -1,4 +1,6 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
+
 dir = File.dirname(__FILE__)
 Dir.chdir(File.dirname(dir))
 begin

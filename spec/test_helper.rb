@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 root = File.absolute_path(File.join(File.dirname(__FILE__), ".."))
 Dir.chdir(root)
 
@@ -22,7 +24,7 @@ end
 
 trap("SIGQUIT") do
   if Thread.respond_to?(:list)
-    output = "----- #{Time.now} -----\n"
+    output = String.new("----- #{Time.now} -----\n")
     Thread.list.each do |thread|
       output << "##### #{thread}\n"
       output << thread.backtrace.join("\n")
@@ -36,7 +38,7 @@ end
 
 module TestHelper
   def new_controller(options = {})
-    @start_command = "./spec/run_echo_server -l spec/echo_server.log -P spec/echo_server.pid"
+    @start_command = String.new("./spec/run_echo_server -l spec/echo_server.log -P spec/echo_server.pid")
     if options[:wait1]
       @start_command << " --wait1 #{options[:wait1]}"
     end

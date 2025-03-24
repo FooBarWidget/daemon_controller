@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # daemon_controller, library for robust daemon management
 # Copyright (c) 2010-2025 Asynchronous B.V.
 #

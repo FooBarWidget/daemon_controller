@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "lib/daemon_controller/version"
 require_relative "lib/daemon_controller/packaging"
 
