@@ -97,25 +97,67 @@ describe DaemonController, "#start" do
     expect(ping_echo_server).to be true
   end
 
-  it "raises StartTimeout if the daemon doesn't start in time" do
-    if exec_is_slow?
-      start_timeout = 4
-      min_start_timeout = 0
-      max_start_timeout = 6
-    else
-      start_timeout = 0.15
-      min_start_timeout = 0.15
-      max_start_timeout = 0.30
-    end
-    new_controller(start_command: "sleep 2", start_timeout: start_timeout)
-    start_time = Time.now
-    end_time = nil
-    expect(@controller).to receive(:start_timed_out) { end_time = Time.now }
-    begin
+  context "if the daemon doesn't start in time" do
+    let(:start_timeout) { exec_is_slow? ? 4 : 0.5 }
+    let(:min_start_timeout) { 0.5 }
+    let(:max_start_timeout) { exec_is_slow? ? 6 : 1 }
+
+    it "raises StartTimeout" do
+      new_controller(start_command: "sleep 2", start_timeout: start_timeout)
+      start_time = Time.now
+      end_time = nil
+      expect(@controller).to receive(:start_timed_out) { end_time = Time.now }
       expect { @controller.start }.to raise_error(DaemonController::StartTimeout)
       expect(end_time - start_time).to be_between(min_start_timeout, max_start_timeout)
-    ensure
-      @controller.stop
+    end
+
+    it "reports logs written to the log file if the timeout happened before forking" do
+      new_controller(log_message: "hello world",
+        wait2: 10,
+        start_timeout: start_timeout,
+        no_daemonize: true)
+      expect(@controller).to receive(:daemonization_timed_out)
+      begin
+        @controller.start
+        violated
+      rescue DaemonController::StartTimeout => e
+        expect(e.message).to include("hello world")
+      end
+    end
+
+    it "reports logs if the timeout happened after forking" do
+      new_controller(log_message: "hello world",
+        wait2: 10,
+        start_timeout: start_timeout)
+      expect(@controller).not_to receive(:daemonization_timed_out)
+      begin
+        @controller.start
+        violated
+      rescue DaemonController::StartTimeout => e
+        expect(e.message).to include("hello world")
+      end
+    end
+
+    specify "if there are no logs, then the error says so" do
+      new_controller(start_command: "sleep 10", start_timeout: start_timeout)
+      expect(@controller).to receive(:daemonization_timed_out)
+      begin
+        @controller.start
+        violated
+      rescue DaemonController::StartTimeout => e
+        expect(e.message).to eq("(logs empty; timed out)")
+      end
+    end
+
+    specify "if logs cannot be captured, then the error says so" do
+      new_controller(start_command: "sleep 10", start_timeout: start_timeout, log_file: "/dev/stderr")
+      expect(@controller).to receive(:daemonization_timed_out)
+      begin
+        @controller.start
+        violated
+      rescue DaemonController::StartTimeout => e
+        expect(e.message).to eq("(logs not available; timed out)")
+      end
     end
   end
 
@@ -131,7 +173,7 @@ describe DaemonController, "#start" do
     }
     begin
       block = lambda { @controller.start }
-      expect(&block).to raise_error(DaemonController::StartTimeout, /failed to start in time/)
+      expect(&block).to raise_error(DaemonController::StartTimeout)
       eventually(1) do
         !process_is_alive?(pid)
       end
@@ -159,7 +201,7 @@ describe DaemonController, "#start" do
       pid = @controller.send(:read_pid_file)
     }
     block = lambda { @controller.start }
-    expect(&block).to raise_error(DaemonController::StartTimeout, /didn't daemonize in time/)
+    expect(&block).to raise_error(DaemonController::StartTimeout, /logs empty/)
     eventually(1) do
       !process_is_alive?(pid)
     end

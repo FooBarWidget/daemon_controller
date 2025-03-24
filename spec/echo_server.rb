@@ -31,6 +31,9 @@ parser = OptionParser.new do |opts|
   opts.on("-P", "--pid-file FILENAME", String, "Pid file to use.") do |value|
     options[:pid_file] = File.absolute_path(value)
   end
+  opts.on("--log-message MESSAGE", String, "Log message before writing pid file.") do |value|
+    options[:log_message] = value
+  end
   opts.on("--wait1 SECONDS", Float, "Wait a few seconds before writing pid file.") do |value|
     options[:wait1] = value
   end
@@ -75,6 +78,10 @@ def main(options)
   $stderr.sync = true
   Dir.chdir(options[:chdir])
   File.umask(0)
+
+  if options[:log_message]
+    puts options[:log_message]
+  end
 
   if options[:env_file]
     File.write(options[:env_file], "\0")

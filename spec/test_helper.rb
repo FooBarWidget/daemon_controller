@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "shellwords"
+
 root = File.absolute_path(File.join(File.dirname(__FILE__), ".."))
 Dir.chdir(root)
 
@@ -28,7 +30,7 @@ trap("SIGQUIT") do
     Thread.list.each do |thread|
       output << "##### #{thread}\n"
       output << thread.backtrace.join("\n")
-      output << "\n"
+      output << "\n\n"
     end
     output << "--------------------"
     warn(output)
@@ -39,6 +41,9 @@ end
 module TestHelper
   def new_controller(options = {})
     @start_command = String.new("./spec/run_echo_server -l spec/echo_server.log -P spec/echo_server.pid")
+    if options[:log_message]
+      @start_command << " --log-message #{Shellwords.escape options[:log_message]}"
+    end
     if options[:wait1]
       @start_command << " --wait1 #{options[:wait1]}"
     end

@@ -49,9 +49,32 @@ class DaemonController
   end
 
   class StartError < Error
+    attr_reader :logs
+
+    def initialize(logs)
+      if logs.nil?
+        super("(logs not available)")
+      elsif logs.empty?
+        super("(logs empty)")
+      else
+        super
+      end
+      @logs = logs
+    end
   end
 
   class StartTimeout < TimeoutError
+    attr_reader :logs
+
+    def initialize(logs)
+      if logs.nil?
+        super("(logs not available; timed out)")
+      elsif logs.empty?
+        super("(logs empty; timed out)")
+      else
+        super("#{logs} (timed out)")
+      end
+    end
   end
 
   class StopError < Error
@@ -63,6 +86,7 @@ class DaemonController
   class ConnectError < Error
   end
 
+  # Internal, not publicly thrown.
   class DaemonizationTimeout < TimeoutError
   end
 
@@ -385,7 +409,7 @@ class DaemonController
           if log_file_has_changed?
             record_activity
           elsif no_activity?(@log_file_activity_timeout)
-            raise Timeout::Error, "Daemon seems to have exited"
+            raise Timeout::Error, "Log file inactivity"
           end
           pid_file_available?
         end
@@ -393,7 +417,7 @@ class DaemonController
           if log_file_has_changed?
             record_activity
           elsif no_activity?(@log_file_activity_timeout)
-            raise Timeout::Error, "Daemon seems to have exited"
+            raise Timeout::Error, "Log file inactivity"
           end
           run_ping_command || !daemon_is_running?
         end
@@ -411,15 +435,13 @@ class DaemonController
         :start_timeout
       end
     end
+
     if !result
-      raise(StartError, differences_in_log_file ||
-        "Daemon '#{@identifier}' failed to start")
+      raise StartError, differences_in_log_file
     elsif result == :daemonization_timeout
-      raise(StartTimeout, differences_in_log_file ||
-        "Daemon '#{@identifier}' didn't daemonize in time")
+      raise StartTimeout, differences_in_log_file
     elsif result == :start_timeout
-      raise(StartTimeout, differences_in_log_file ||
-        "Daemon '#{@identifier}' failed to start in time")
+      raise StartTimeout, differences_in_log_file
     else
       true
     end
@@ -588,12 +610,7 @@ class DaemonController
     if @original_log_file_stat && @original_log_file_stat.file?
       File.open(@log_file, "r") do |f|
         f.seek(@original_log_file_stat.size, IO::SEEK_SET)
-        diff = f.read.strip
-        if diff.empty?
-          nil
-        else
-          diff
-        end
+        f.read.strip
       end
     end
   rescue Errno::ENOENT, Errno::ESPIPE
