@@ -481,10 +481,10 @@ class DaemonController
       # The PID file may not exist, or another thread/process
       # executing #running? may have just deleted the PID file.
       # So we catch this error.
-      pid = nil
+      return nil
     end
     if pid.nil?
-      false
+      nil
     elsif check_pid(pid)
       true
     else

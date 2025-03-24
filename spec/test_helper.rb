@@ -115,6 +115,23 @@ module TestHelper
     end
     raise "Time limit exceeded"
   end
+
+  def find_echo_server_pid
+    process_line = `ps aux`.lines.grep(/echo_server\.rb/).first
+    process_line.split[1].to_i if process_line
+  end
+
+  def kill_and_wait_echo_server
+    pid = find_echo_server_pid
+    if pid
+      Process.kill("SIGTERM", pid)
+      Timeout.timeout(5) do
+        while find_echo_server_pid
+          sleep(0.1)
+        end
+      end
+    end
+  end
 end
 
 # A thread which doesn't execute its block until the

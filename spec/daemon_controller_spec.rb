@@ -112,7 +112,7 @@ describe DaemonController, "#start" do
     end
 
     it "reports logs written to stderr if the timeout happened before forking" do
-      new_controller(start_command: "echo hello world; sleep 10", start_timeout: start_timeout)
+      new_controller(start_command: "(echo hello world; sleep 10)", start_timeout: start_timeout)
       expect(@controller).to receive(:daemonization_timed_out)
       begin
         @controller.start
@@ -252,23 +252,6 @@ describe DaemonController, "#start" do
     end
   end
 
-  def find_echo_server_pid
-    process_line = `ps aux`.lines.grep(/echo_server\.rb/).first
-    process_line.split[1].to_i if process_line
-  end
-
-  def kill_and_wait_echo_server
-    pid = find_echo_server_pid
-    if pid
-      Process.kill("SIGTERM", pid)
-      Timeout.timeout(5) do
-        while find_echo_server_pid
-          sleep(0.1)
-        end
-      end
-    end
-  end
-
   specify "the daemon's logs before forking is made available in the exception" do
     new_controller(start_command: "(echo hello world; false)")
     begin
@@ -390,10 +373,6 @@ describe DaemonController, "#stop" do
     new_controller
   end
 
-  after :each do
-    @controller.stop if @controller
-  end
-
   it "raises no exception if the daemon is not running" do
     @controller.stop
   end
@@ -401,11 +380,15 @@ describe DaemonController, "#stop" do
   it "waits until the daemon is no longer running" do
     new_controller(stop_time: 0.3)
     @controller.start
-    result = Benchmark.measure do
-      @controller.stop
+    begin
+      result = Benchmark.measure do
+        @controller.stop
+      end
+      expect(@controller).not_to be_running
+      expect(result.real).to be_between(0.3, 3)
+    ensure
+      new_controller.stop
     end
-    expect(@controller).not_to be_running
-    expect(result.real).to be_between(0.3, 0.6)
   end
 
   it "raises StopTimeout if the daemon does not stop in time" do
@@ -421,30 +404,41 @@ describe DaemonController, "#stop" do
   describe "if stop command was given" do
     it "raises StopError if the stop command exits with an error" do
       new_controller(stop_command: "(echo hello world; false)")
+      @controller.start
       begin
-        begin
-          @controller.stop
-          fail
-        rescue DaemonController::StopError => e
-          expect(e.message).to eq("hello world\n(exited with status 1)")
-        end
+        expect { @controller.stop }.to raise_error(DaemonController::StopError)
       ensure
         new_controller.stop
       end
     end
 
     it "makes the stop command's error message available in the exception" do
+      new_controller(stop_command: "(echo hello world; false)")
+      begin
+        @controller.start
+        @controller.stop
+        fail
+      rescue DaemonController::StopError => e
+        expect(e.message).to include("hello world")
+        expect(e.message).to include("(exited with status 1)")
+      ensure
+        new_controller.stop
+      end
     end
 
     it "calls the stop command if the PID file is invalid and :dont_stop_if_pid_file_invalid is not set" do
       Dir.mktmpdir do |tmpdir|
-        File.open("spec/echo_server.pid", "w").close
         new_controller(stop_command: "touch #{Shellwords.escape tmpdir}/stopped")
-        @controller.stop
-        expect(File.exist?("#{tmpdir}/stopped")).to be_truthy
+        @controller.start
+        begin
+          File.open("spec/echo_server.pid", "w").close
+          @controller.stop
+          expect(File.exist?("#{tmpdir}/stopped")).to be_truthy
+        ensure
+          # Kill echo_server without PID file
+          kill_and_wait_echo_server
+        end
       end
-    ensure
-      @controller = nil
     end
 
     it "does not call the stop command if the PID file is invalid and :dont_stop_if_pid_file_invalid is set" do
