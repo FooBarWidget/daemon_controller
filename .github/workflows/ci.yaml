@@ -79,11 +79,11 @@ jobs:
         id: get_version
         run: |
           VERSION_STRING=$(ruby -r ./lib/daemon_controller/version.rb -e "puts DaemonController::VERSION_STRING")
-          if ! [[ "$GITHUB_REF_NAME" =~ ^v ]]; then
-            echo "Tag name must start with a 'v'."
+          if ! [[ "$GITHUB_REF_NAME" =~ ^release- ]]; then
+            echo "Tag name must start with a 'release-'."
             exit 1
           fi
-          if [[ "$GITHUB_REF_NAME" != "v${VERSION_STRING}" ]]; then
+          if [[ "$GITHUB_REF_NAME" != "release-${VERSION_STRING}" ]]; then
             echo "Tag version ($GITHUB_REF_NAME) does not match version.rb ($VERSION_STRING)"
             exit 1
           fi
