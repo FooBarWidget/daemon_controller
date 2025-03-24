@@ -8,31 +8,39 @@ require "tmpdir"
 require "shellwords"
 
 describe DaemonController, "#start" do
-  before :each do
-    new_controller
-  end
-
   include TestHelper
 
+  after :each do
+    @controller.stop if @controller
+  end
+
   it "works" do
+    new_controller
     @controller.start
-    expect(ping_echo_server).to be true
-    @controller.stop
+    expect(ping_echo_server).to be(true)
   end
 
   it "raises AlreadyStarted if the daemon is already running" do
-    expect(@controller).to receive(:daemon_is_running?).and_return(true)
-    expect { @controller.start }.to raise_error(DaemonController::AlreadyStarted)
+    new_controller
+    begin
+      expect(@controller).to receive(:daemon_is_running?).and_return(true)
+      expect { @controller.start }.to raise_error(DaemonController::AlreadyStarted)
+    ensure
+      @controller = nil # Don't invoke @controller.stop in after hook
+    end
   end
 
   it "deletes existing PID file before starting the daemon" do
     write_file("spec/echo_server.pid", "1234")
+    new_controller
     expect(@controller).to receive(:daemon_is_running?).and_return(false)
     expect(@controller).to receive(:spawn_daemon)
     expect(@controller).to receive(:pid_file_available?).and_return(true)
     expect(@controller).to receive(:run_ping_command).at_least(:once).and_return(true)
     @controller.start
     expect(File.exist?("spec/echo_server.pid")).to be false
+  ensure
+    @controller = nil # Don't invoke @controller.stop in after hook
   end
 
   it "blocks until the daemon has written to its PID file" do
@@ -40,6 +48,7 @@ describe DaemonController, "#start" do
       sleep 0.15
       write_file("spec/echo_server.pid", "1234")
     end
+    new_controller
     expect(@controller).to receive(:daemon_is_running?) { false }
     expect(@controller).to receive(:spawn_daemon) { thread.go! }
     expect(@controller).to receive(:run_ping_command).at_least(:once).and_return(true)
@@ -51,6 +60,8 @@ describe DaemonController, "#start" do
     ensure
       thread.join
     end
+  ensure
+    @controller = nil # Don't invoke @controller.stop in after hook
   end
 
   it "blocks until the daemon can be pinged" do
@@ -60,6 +71,7 @@ describe DaemonController, "#start" do
       sleep 0.15
       ping_ok = true
     end
+    new_controller
     expect(@controller).to receive(:daemon_is_running?).at_least(:once) { running }
     expect(@controller).to receive(:spawn_daemon) {
       thread.go!
@@ -75,13 +87,14 @@ describe DaemonController, "#start" do
     ensure
       thread.join
     end
+  ensure
+    @controller = nil # Don't invoke @controller.stop in after hook
   end
 
   it "works when the log file is not a regular file" do
     new_controller(log_file: "/dev/stderr")
     @controller.start
     expect(ping_echo_server).to be true
-    @controller.stop
   end
 
   it "raises StartTimeout if the daemon doesn't start in time" do
@@ -205,11 +218,7 @@ describe DaemonController, "#start" do
       called = true
       @start_command
     })
-    begin
-      @controller.start
-    ensure
-      @controller.stop
-    end
+    @controller.start
     expect(called).to be true
   end
 
@@ -222,11 +231,7 @@ describe DaemonController, "#start" do
       },
       before_start: lambda { log << "before_start" }
     )
-    begin
-      @controller.start
-    ensure
-      @controller.stop
-    end
+    @controller.start
     expect(log).to eq(["before_start", "start_command"])
   end
 
@@ -234,13 +239,9 @@ describe DaemonController, "#start" do
     a, b = IO.pipe
     begin
       new_controller(keep_ios: [b])
-      begin
-        @controller.start
-        b.close
-        expect(select([a], nil, nil, 0)).to be_nil
-      ensure
-        @controller.stop
-      end
+      @controller.start
+      b.close
+      expect(select([a], nil, nil, 0)).to be_nil
     ensure
       a.close if !a.closed?
       b.close if !b.closed?
@@ -251,7 +252,6 @@ describe DaemonController, "#start" do
     new_controller(no_daemonize: true, daemonize_for_me: true)
     @controller.start
     expect(ping_echo_server).to be true
-    @controller.stop
   end
 
   it "receives environment variables" do
@@ -259,7 +259,6 @@ describe DaemonController, "#start" do
     File.unlink("spec/env_file.tmp") if File.exist?("spec/env_file.tmp")
     @controller.start
     expect(File.exist?("spec/env_file.tmp")).to be true
-    @controller.stop
   end
 end
 
