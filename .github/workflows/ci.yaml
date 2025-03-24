@@ -63,6 +63,8 @@ jobs:
     environment: release
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -90,6 +92,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: gem
+
+      - name: Create attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "daemon_controller-*.gem"
 
       - name: Push gem to RubyGems
         run: gem push daemon_controller-*.gem
