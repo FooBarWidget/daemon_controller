@@ -19,16 +19,16 @@ describe DaemonController, "#start" do
   end
 
   it "raises AlreadyStarted if the daemon is already running" do
-    @controller.should_receive(:daemon_is_running?).and_return(true)
-    lambda { @controller.start }.should raise_error(DaemonController::AlreadyStarted)
+    expect(@controller).to receive(:daemon_is_running?).and_return(true)
+    expect { @controller.start }.to raise_error(DaemonController::AlreadyStarted)
   end
 
   it "deletes existing PID file before starting the daemon" do
     write_file("spec/echo_server.pid", "1234")
-    @controller.should_receive(:daemon_is_running?).and_return(false)
-    @controller.should_receive(:spawn_daemon)
-    @controller.should_receive(:pid_file_available?).and_return(true)
-    @controller.should_receive(:run_ping_command).at_least(:once).and_return(true)
+    expect(@controller).to receive(:daemon_is_running?).and_return(false)
+    expect(@controller).to receive(:spawn_daemon)
+    expect(@controller).to receive(:pid_file_available?).and_return(true)
+    expect(@controller).to receive(:run_ping_command).at_least(:once).and_return(true)
     @controller.start
     expect(File.exist?("spec/echo_server.pid")).to be false
   end
@@ -45,7 +45,7 @@ describe DaemonController, "#start" do
       result = Benchmark.measure do
         @controller.start
       end
-      (0.15..0.30).should === result.real
+      expect(result.real).to be_between(0.15, 0.30)
     ensure
       thread.join
     end
@@ -69,7 +69,7 @@ describe DaemonController, "#start" do
       result = Benchmark.measure do
         @controller.start
       end
-      (0.15..0.30).should === result.real
+      expect(result.real).to be_between(0.15, 0.30)
     ensure
       thread.join
     end
@@ -97,8 +97,8 @@ describe DaemonController, "#start" do
     end_time = nil
     expect(@controller).to receive(:start_timed_out) { end_time = Time.now }
     begin
-      lambda { @controller.start }.should raise_error(DaemonController::StartTimeout)
-      (min_start_timeout..max_start_timeout).should === end_time - start_time
+      expect { @controller.start }.to raise_error(DaemonController::StartTimeout)
+      expect(end_time - start_time).to be_between(min_start_timeout, max_start_timeout)
     ensure
       @controller.stop
     end
@@ -116,7 +116,7 @@ describe DaemonController, "#start" do
     }
     begin
       block = lambda { @controller.start }
-      block.should raise_error(DaemonController::StartTimeout, /failed to start in time/)
+      expect(&block).to raise_error(DaemonController::StartTimeout, /failed to start in time/)
       eventually(1) do
         !process_is_alive?(pid)
       end
@@ -144,7 +144,7 @@ describe DaemonController, "#start" do
       pid = @controller.send(:read_pid_file)
     }
     block = lambda { @controller.start }
-    block.should raise_error(DaemonController::StartTimeout, /didn't daemonize in time/)
+    expect(&block).to raise_error(DaemonController::StartTimeout, /didn't daemonize in time/)
     eventually(1) do
       !process_is_alive?(pid)
     end
@@ -158,12 +158,12 @@ describe DaemonController, "#start" do
 
   it "raises an error if the daemon exits with an error before forking" do
     new_controller(start_command: "false")
-    lambda { @controller.start }.should raise_error(DaemonController::Error)
+    expect { @controller.start }.to raise_error(DaemonController::Error)
   end
 
   it "raises an error if the daemon exits with an error after forking" do
     new_controller(crash_before_bind: true, log_file_activity_timeout: 0.2)
-    lambda { @controller.start }.should raise_error(DaemonController::Error)
+    expect { @controller.start }.to raise_error(DaemonController::Error)
   end
 
   specify "the daemon's error output before forking is made available in the exception" do
@@ -181,7 +181,7 @@ describe DaemonController, "#start" do
       @controller.start
       violated
     rescue DaemonController::StartTimeout => e
-      e.message.should =~ /crashing, as instructed/
+      expect(e.message).to match(/crashing, as instructed/)
     end
   end
 
@@ -193,7 +193,7 @@ describe DaemonController, "#start" do
       @controller.start
       violated
     rescue DaemonController::StartTimeout => e
-      e.message.should == "Daemon 'My Test Daemon' failed to start in time."
+      expect(e.message).to eq("Daemon 'My Test Daemon' failed to start in time.")
     end
   end
 
@@ -225,7 +225,7 @@ describe DaemonController, "#start" do
     ensure
       @controller.stop
     end
-    log.should == ["before_start", "start_command"]
+    expect(log).to eq(["before_start", "start_command"])
   end
 
   it "keeps the file descriptors in 'keep_ios' open" do
@@ -235,7 +235,7 @@ describe DaemonController, "#start" do
       begin
         @controller.start
         b.close
-        select([a], nil, nil, 0).should be_nil
+        expect(select([a], nil, nil, 0)).to be_nil
       ensure
         @controller.stop
       end
@@ -282,15 +282,15 @@ describe DaemonController, "#stop" do
     result = Benchmark.measure do
       @controller.stop
     end
-    @controller.should_not be_running
-    result.real.should be_between(0.3, 0.6)
+    expect(@controller).not_to be_running
+    expect(result.real).to be_between(0.3, 0.6)
   end
 
   it "raises StopTimeout if the daemon does not stop in time" do
     new_controller(stop_time: 0.3, stop_timeout: 0.1)
     @controller.start
     begin
-      lambda { @controller.stop }.should raise_error(DaemonController::StopTimeout)
+      expect { @controller.stop }.to raise_error(DaemonController::StopTimeout)
     ensure
       new_controller.stop
     end
@@ -350,8 +350,8 @@ describe DaemonController, "#restart" do
 
   describe "with no restart command" do
     it "restart the daemon using stop and start" do
-      @controller.should_receive(:stop)
-      @controller.should_receive(:start)
+      expect(@controller).to receive(:stop)
+      expect(@controller).to receive(:start)
       @controller.restart
     end
   end
@@ -361,7 +361,7 @@ describe DaemonController, "#restart" do
       stop_cmd = "echo 'hello world'"
       new_controller restart_command: stop_cmd
 
-      @controller.should_receive(:run_command).with(stop_cmd)
+      expect(@controller).to receive(:run_command).with(stop_cmd)
       @controller.restart
     end
   end
@@ -423,7 +423,7 @@ describe DaemonController do
       socket = TCPSocket.new("localhost", 8278)
     end)
     @controller.send(:run_ping_command)
-    socket.should be_closed
+    expect(socket).to be_closed
   end
 
   specify "if the ping command is a block that returns an object that responds to #close, " \
@@ -434,7 +434,7 @@ describe DaemonController do
     new_controller(ping_command: lambda do
       o
     end)
-    lambda { @controller.send(:run_ping_command) }.should_not raise_error
+    expect { @controller.send(:run_ping_command) }.not_to raise_error
   end
 
   specify "the ping command may be [:tcp, hostname, port]" do
@@ -457,18 +457,9 @@ describe DaemonController do
     specify "a ping command of type [:unix, filename] is not supported on this Ruby implementation" do
       new_controller(ping_command: [:unix, "spec/foo.sock"])
       @server = UNIXServer.new("spec/foo.sock")
-      lambda { @controller.send(:run_ping_command) }.should raise_error(
+      expect { @controller.send(:run_ping_command) }.to raise_error(
         "Pinging Unix domain sockets is not supported on this Ruby implementation"
       )
     end
-  end
-end
-
-RSpec.configure do |config|
-  config.mock_with :rspec do |c|
-    c.syntax = [:should, :expect]
-  end
-  config.expect_with :rspec do |c|
-    c.syntax = [:should, :expect]
   end
 end
