@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    daemon_controller (1.2.1)
+    daemon_controller (2.0.0)
 
 GEM
   remote: https://rubygems.org/
