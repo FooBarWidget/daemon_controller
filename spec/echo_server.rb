@@ -27,7 +27,7 @@ parser = OptionParser.new do |opts|
     options[:log_file] = value
   end
   opts.on("-P", "--pid-file FILENAME", String, "Pid file to use.") do |value|
-    options[:pid_file] = File.expand_path(value)
+    options[:pid_file] = File.absolute_path(value)
   end
   opts.on("--wait1 SECONDS", Float, "Wait a few seconds before writing pid file.") do |value|
     options[:wait1] = value
@@ -62,7 +62,7 @@ if options[:pid_file]
 end
 
 if ENV["ENV_FILE"]
-  options[:env_file] = File.expand_path(ENV["ENV_FILE"])
+  options[:env_file] = File.absolute_path(ENV["ENV_FILE"])
 end
 
 def main(options)

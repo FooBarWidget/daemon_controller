@@ -1,4 +1,4 @@
-root = File.expand_path(File.join(File.dirname(__FILE__), ".."))
+root = File.absolute_path(File.join(File.dirname(__FILE__), ".."))
 Dir.chdir(root)
 
 # Ensure subprocesses (with could be a different Ruby) are

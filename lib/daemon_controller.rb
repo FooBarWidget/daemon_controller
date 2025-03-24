@@ -34,7 +34,7 @@ class DaemonController
     Errno::ETIMEDOUT, Errno::ECONNRESET, Errno::EINVAL,
     Errno::EADDRNOTAVAIL]
 
-  SPAWNER_FILE = File.expand_path(File.join(File.dirname(__FILE__),
+  SPAWNER_FILE = File.absolute_path(File.join(File.dirname(__FILE__),
     "daemon_controller", "spawn.rb"))
 
   class Error < StandardError
@@ -601,9 +601,9 @@ class DaemonController
 
   def determine_lock_file(options, identifier, pid_file)
     if options[:lock_file]
-      LockFile.new(File.expand_path(options[:lock_file]))
+      LockFile.new(File.absolute_path(options[:lock_file]))
     else
-      LockFile.new(File.expand_path(pid_file + ".lock"))
+      LockFile.new(File.absolute_path(pid_file + ".lock"))
     end
   end
 
