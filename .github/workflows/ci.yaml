@@ -78,7 +78,7 @@ jobs:
       - name: Verify version number
         id: get_version
         run: |
-          VERSION_STRING=$(ruby -r ./lib/DaemonController/version.rb -e "puts DaemonController::VERSION_STRING")
+          VERSION_STRING=$(ruby -r ./lib/daemon_controller/version.rb -e "puts DaemonController::VERSION_STRING")
           if ! [[ "$GITHUB_REF_NAME" =~ ^v ]]; then
             echo "Tag name must start with a 'v'."
             exit 1
