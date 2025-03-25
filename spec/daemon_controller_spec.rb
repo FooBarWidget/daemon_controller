@@ -6,12 +6,16 @@ require "benchmark"
 require "socket"
 require "tmpdir"
 require "shellwords"
+require "stringio"
+require "logger"
 
 describe DaemonController, "#start" do
   include TestHelper
 
-  after :each do
+  around :each do |example|
+    error = example.run
     @controller.stop if @controller
+    print_logs(example) if error
   end
 
   it "works" do
@@ -34,7 +38,7 @@ describe DaemonController, "#start" do
     write_file("spec/echo_server.pid", "1234")
     new_controller
     expect(@controller).to receive(:daemon_is_running?).and_return(false)
-    expect(@controller).to receive(:spawn_daemon)
+    expect(@controller).to receive(:spawn_daemon).and_return(DaemonController::InternalCommandOkResult.new(1, ""))
     expect(@controller).to receive(:pid_file_available?).and_return(true)
     expect(@controller).to receive(:run_ping_command).at_least(:once).and_return(true)
     @controller.start
@@ -50,7 +54,10 @@ describe DaemonController, "#start" do
     end
     new_controller
     expect(@controller).to receive(:daemon_is_running?) { false }
-    expect(@controller).to receive(:spawn_daemon) { thread.go! }
+    expect(@controller).to receive(:spawn_daemon) {
+      thread.go!
+      DaemonController::InternalCommandOkResult.new(1, "")
+    }
     expect(@controller).to receive(:run_ping_command).at_least(:once).and_return(true)
     begin
       result = Benchmark.measure do
@@ -76,6 +83,7 @@ describe DaemonController, "#start" do
     expect(@controller).to receive(:spawn_daemon) {
       thread.go!
       running = true
+      DaemonController::InternalCommandOkResult.new(1, "")
     }
     expect(@controller).to receive(:pid_file_available?).and_return(true)
     expect(@controller).to receive(:run_ping_command).at_least(:once) { ping_ok }
@@ -97,222 +105,316 @@ describe DaemonController, "#start" do
     expect(ping_echo_server).to be(true)
   end
 
-  context "if the daemon doesn't start in time" do
-    let(:start_timeout) { exec_is_slow? ? 4 : 0.5 }
-    let(:min_start_timeout) { 0.5 }
-    let(:max_start_timeout) { exec_is_slow? ? 6 : 1 }
+  context "if the daemon exits with an error" do
+    context "before forking" do
+      it "raises StartError" do
+        new_controller(start_command: "false")
+        expect { @controller.start }.to raise_error(DaemonController::StartError)
+      end
 
+      it "makes outputs available in the exception" do
+        new_controller(start_command: "(echo hello world; false)")
+        expect { @controller.start }.to raise_error(DaemonController::StartError, /hello world/)
+      end
+
+      it "doesn't make outputs available if the log file is not a regular file" do
+        new_controller(start_command: "false", log_file: "/dev/stderr")
+        expect { @controller.start }.to raise_error(DaemonController::StartError, /logs not available/)
+      end
+
+      it "makes file logs available in the exception" do
+        new_controller(start_command: "(echo hello world; false)")
+        begin
+          @controller.start
+        rescue DaemonController::StartError => e
+          expect(e.message).to eq("hello world\n(exited with status 1)")
+        end
+      end
+
+      specify "if file logs are available but empty, then the exception says so" do
+        new_controller(start_command: "exit 1")
+        begin
+          @controller.start
+          fail
+        rescue DaemonController::StartError => e
+          expect(e.message).to eq("(logs empty; exited with status 1)")
+        end
+      end
+
+      it "makes the exit signal available in the exception if the log file is a regular file" do
+        new_controller(crash_before_bind: true, crash_signal: "SIGXCPU", no_daemonize: true)
+        begin
+          @controller.start
+          fail
+        rescue DaemonController::StartError => e
+          expect(e.message).to include("crashing, as instructed")
+          expect(e.message).to include("SIGXCPU")
+        end
+      end
+
+      it "makes the exit signal available in the exception if the log file is not a regular file" do
+        new_controller(crash_before_bind: true,
+          crash_signal: "SIGXCPU",
+          no_daemonize: true,
+          log_file: "/dev/stderr")
+        begin
+          @controller.start
+          fail
+        rescue DaemonController::StartError => e
+          expect(e.message).to include("logs not available")
+          expect(e.message).to include("SIGXCPU")
+        end
+      end
+    end
+
+    context "after forking" do
+      it "raises StartError" do
+        new_controller(crash_before_bind: true)
+        expect { @controller.start }.to raise_error(DaemonController::StartError)
+      end
+
+      it "makes outputs available in the exception" do
+        new_controller(log_message1: "hello world", crash_before_bind: true)
+        expect { @controller.start }.to raise_error(DaemonController::StartError, /hello world/)
+      end
+
+      it "doesn't make outputs available if the log file is not a regular file" do
+        new_controller(crash_before_bind: true, log_file: "/dev/stderr")
+        expect { @controller.start }.to raise_error(DaemonController::StartError, "(logs not available)")
+      end
+
+      it "makes file logs available in the exception" do
+        new_controller(crash_before_bind: true)
+        expect { @controller.start }.to raise_error(DaemonController::StartError, /crashing, as instructed/)
+      end
+
+      specify "if the daemon didn't write a PID file, then the error is detected through log file inactivity" do
+        new_controller(log_message1: "hello",
+          log_message2: "world",
+          no_write_pid_file: true,
+          log_file_activity_timeout: 0.5)
+        begin
+          @controller.start
+          fail
+        rescue DaemonController::StartTimeout => e
+          expect(e.message).to include("hello")
+          expect(e.message).to include("world")
+          expect(e.message).to include("(timed out)")
+        ensure
+          # Kill echo_server without PID file
+          kill_and_wait_echo_server
+        end
+      end
+    end
+  end
+
+  context "if the daemon doesn't start in time" do
     it "raises StartTimeout" do
-      new_controller(start_command: "sleep 2", start_timeout: start_timeout)
-      start_time = Time.now
+      start_timeout = exec_is_slow? ? 4 : 0.5
+      min_start_timeout = 0.5
+      max_start_timeout = exec_is_slow? ? 6 : 1
+
+      new_controller(start_command: "sleep 10", start_timeout: start_timeout)
+      start_time = monotonic_time
       end_time = nil
-      expect(@controller).to receive(:start_timed_out) { end_time = Time.now }
+      expect(@controller).to receive(:daemonization_timed_out) { end_time = monotonic_time }
       expect { @controller.start }.to raise_error(DaemonController::StartTimeout)
       expect(end_time - start_time).to be_between(min_start_timeout, max_start_timeout)
     end
 
-    it "reports logs written to stderr if the timeout happened before forking" do
-      new_controller(start_command: "(echo hello world; sleep 10)", start_timeout: start_timeout)
-      expect(@controller).to receive(:daemonization_timed_out)
-      begin
-        @controller.start
-        fail
-      rescue DaemonController::StartTimeout => e
-        expect(e.message).to include("hello world")
-      end
-    end
-
-    it "reports logs written to the log file if the timeout happened before forking" do
+    it "doesn't terminate the fork if the daemon forked right before we perform termination" do
       new_controller(log_message2: "hello world",
-        wait2: 10,
-        start_timeout: start_timeout,
-        no_daemonize: true)
-      expect(@controller).to receive(:daemonization_timed_out)
-      begin
-        @controller.start
-        fail
-      rescue DaemonController::StartTimeout => e
-        expect(e.message).to include("hello world")
+        wait1: 0.5,
+        start_timeout: 0.1)
+      expect(@controller).to receive(:daemonization_timed_out) { |p|
+        wait_until_pid_file_available
+      }
+      expect { @controller.start }.to raise_error(DaemonController::StartTimeout)
+      expect(@controller).to be_running
+    end
+
+    context "if the daemon hasn't forked yet" do
+      it "terminates the daemon gracefully" do
+        new_controller(start_command: "./spec/run_in_mri_ruby unresponsive_daemon.rb",
+          start_timeout: 0.1)
+
+        pid = nil
+        expect(@controller).to receive(:daemonization_timed_out) { |p|
+          pid = p
+          wait_until_pid_file_available
+        }
+
+        allow(Process).to receive(:kill).and_call_original
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout, /logs empty/)
+        expect(Process).to have_received(:kill).with("SIGTERM", pid).once
+        expect(Process).not_to have_received(:kill).with("SIGKILL", pid)
+      ensure
+        @controller = nil
+      end
+
+      it "terminates the daemon forcefully if it doesn't gracefully terminate in time" do
+        new_controller(
+          wait2: 10,
+          start_timeout: 0.1,
+          start_abort_timeout: 0.1,
+          ignore_sigterm: true,
+          no_daemonize: true
+        )
+
+        pid = nil
+        expect(@controller).to receive(:daemonization_timed_out) { |p|
+          pid = p
+          wait_until_pid_file_available
+        }
+
+        allow(Process).to receive(:kill).and_call_original
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout)
+        expect(Process).to have_received(:kill).with("SIGTERM", pid).once
+        expect(Process).to have_received(:kill).with("SIGKILL", pid).once
+      end
+
+      it "deletes the PID file" do
+        new_controller(wait2: 10,
+          start_timeout: 0.1,
+          no_daemonize: true)
+        expect(@controller).to receive(:daemonization_timed_out) {
+          wait_until_pid_file_available
+        }
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout)
+        expect(File.exist?("spec/echo_server.pid")).to be(false)
+      end
+
+      it "reports logs written to standard I/O channels" do
+        new_controller(log_message2: "hello world",
+          wait2: 10,
+          start_timeout: 0.1,
+          no_daemonize: true)
+        expect(@controller).to receive(:daemonization_timed_out) { |p|
+          wait_until_pid_file_available
+        }
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout, /hello world/)
+      end
+
+      it "reports logs written to the log file" do
+        new_controller(log_message2: "hello world",
+          wait2: 10,
+          start_timeout: 0.1,
+          no_daemonize: true)
+        expect(@controller).to receive(:daemonization_timed_out) {
+          wait_until_pid_file_available
+        }
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout, /hello world/)
+      end
+
+      specify "if there are no logs, then the error says so" do
+        new_controller(wait2: 10,
+          start_timeout: 0.1,
+          no_daemonize: true)
+        expect(@controller).to receive(:daemonization_timed_out) {
+          wait_until_pid_file_available
+        }
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout, /\(logs empty; timed out\)/)
+      end
+
+      specify "if logs cannot be captured, then the error says so" do
+        new_controller(wait2: 10,
+          start_timeout: 0.1,
+          log_file: "/dev/stderr",
+          no_daemonize: true)
+        expect(@controller).to receive(:daemonization_timed_out) {
+          wait_until_pid_file_available
+        }
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout, /\(logs not available; timed out\)/)
       end
     end
 
-    it "reports logs if the timeout happened after forking" do
-      new_controller(log_message2: "hello world",
-        wait2: 10,
-        start_timeout: start_timeout)
-      expect(@controller).not_to receive(:daemonization_timed_out)
-      begin
-        @controller.start
-        fail
-      rescue DaemonController::StartTimeout => e
-        expect(e.message).to include("hello world")
-      end
-    end
+    context "if the daemon already forked" do
+      it "terminates the daemon gracefully" do
+        new_controller(wait2: 10)
 
-    specify "if there are no logs, then the error says so" do
-      new_controller(start_command: "sleep 10", start_timeout: start_timeout)
-      expect(@controller).to receive(:daemonization_timed_out)
-      begin
-        @controller.start
-        fail
-      rescue DaemonController::StartTimeout => e
-        expect(e.message).to eq("(logs empty; timed out)")
-      end
-    end
+        expect(@controller).to receive(:daemon_spawned) {
+          wait_until_pid_file_available
+          raise Timeout::Error
+        }
 
-    specify "if logs cannot be captured, then the error says so" do
-      new_controller(start_command: "sleep 10", start_timeout: start_timeout, log_file: "/dev/stderr")
-      expect(@controller).to receive(:daemonization_timed_out)
-      begin
-        @controller.start
-        fail
-      rescue DaemonController::StartTimeout => e
-        expect(e.message).to eq("(logs not available; timed out)")
-      end
-    end
-  end
+        pid = nil
+        expect(@controller).to receive(:start_timed_out) { |p| pid = p }
 
-  it "kills the daemon forcefully if the daemon has forked but doesn't " \
-    "become pingable in time, and there's a PID file" do
-    new_controller(wait2: 3, start_timeout: 1)
-    pid = nil
-    expect(@controller).to receive(:start_timed_out) {
-      @controller.send(:wait_until) do
-        @controller.send(:pid_file_available?)
-      end
-      pid = @controller.send(:read_pid_file)
-    }
-    begin
-      block = lambda { @controller.start }
-      expect(&block).to raise_error(DaemonController::StartTimeout)
-      eventually(1) do
-        !process_is_alive?(pid)
+        allow(Process).to receive(:kill).and_call_original
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout)
+        expect(Process).to have_received(:kill).with("SIGTERM", pid).once
+        expect(Process).not_to have_received(:kill).with("SIGKILL", pid)
       end
 
-      # The daemon should not be able to clean up its PID file since
-      # it's killed with SIGKILL.
-      expect(File.exist?("spec/echo_server.pid")).to be true
-    ensure
-      begin
-        File.unlink("spec/echo_server.pid")
-      rescue
-        nil
+      it "terminates the daemon forcefully if it doesn't gracefully terminate in time" do
+        new_controller(wait2: 10,
+          start_abort_timeout: 0.5,
+          ignore_sigterm: true)
+
+        expect(@controller).to receive(:daemon_spawned) {
+          wait_until_pid_file_available
+          raise Timeout::Error
+        }
+
+        pid = nil
+        expect(@controller).to receive(:start_timed_out) { |p| pid = p }
+
+        allow(Process).to receive(:kill).and_call_original
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout)
+        expect(Process).to have_received(:kill).with("SIGTERM", pid).once
+        expect(Process).to have_received(:kill).with("SIGKILL", pid).once
       end
-    end
-  end
 
-  it "kills the daemon if it doesn't start in time and hasn't forked yet" do
-    new_controller(start_command: "./spec/unresponsive_daemon.rb",
-      start_timeout: 0.2)
-    pid = nil
-    expect(@controller).to receive(:daemonization_timed_out) {
-      @controller.send(:wait_until) do
-        @controller.send(:pid_file_available?)
+      it "deletes the PID file" do
+        new_controller(wait2: 10)
+        expect(@controller).to receive(:daemon_spawned) {
+          wait_until_pid_file_available
+          raise Timeout::Error
+        }
+        expect(@controller).to receive(:start_timed_out)
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout)
+        expect(File.exist?("spec/echo_server.pid")).to be(false)
       end
-      pid = @controller.send(:read_pid_file)
-    }
-    block = lambda { @controller.start }
-    expect(&block).to raise_error(DaemonController::StartTimeout, /logs empty/)
-    eventually(1) do
-      !process_is_alive?(pid)
-    end
-  ensure
-    begin
-      File.unlink("spec/echo_server.pid")
-    rescue
-      nil
-    end
-  end
 
-  it "raises an error if the daemon exits with an error before forking" do
-    new_controller(start_command: "false")
-    expect { @controller.start }.to raise_error(DaemonController::StartError)
-  end
+      it "reports logs written to standard I/O channels" do
+        new_controller(log_message1: "hello world", wait2: 10)
+        expect(@controller).to receive(:daemon_spawned) {
+          wait_until_pid_file_available
+          raise Timeout::Error
+        }
+        expect(@controller).to receive(:start_timed_out)
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout, /hello world/)
+      end
 
-  it "raises an error if the daemon exits with an error after forking" do
-    new_controller(crash_before_bind: true)
-    expect { @controller.start }.to raise_error(DaemonController::StartError)
-  end
+      it "reports logs written to the log file" do
+        new_controller(log_message2: "hello world", wait2: 10)
+        expect(@controller).to receive(:daemon_spawned) {
+          wait_until_pid_file_available
+          raise Timeout::Error
+        }
+        expect(@controller).to receive(:start_timed_out)
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout, /hello world/)
+      end
 
-  specify "if the daemon exits after forking without writing a PID file, then this is detected through log file inactivity" do
-    new_controller(log_message1: "hello",
-      log_message2: "world",
-      no_write_pid_file: true,
-      log_file_activity_timeout: 0.5)
-    begin
-      @controller.start
-      fail
-    rescue DaemonController::StartTimeout => e
-      expect(e.message).to include("hello")
-      expect(e.message).to include("world")
-      expect(e.message).to include("(timed out)")
-    ensure
-      # Kill echo_server without PID file
-      kill_and_wait_echo_server
-    end
-  end
+      specify "if there are no logs, then the error says so" do
+        new_controller(wait2: 10)
+        expect(@controller).to receive(:daemon_spawned) {
+          wait_until_pid_file_available
+          raise Timeout::Error
+        }
+        expect(@controller).to receive(:start_timed_out)
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout, /\(logs empty; timed out\)/)
+      end
 
-  specify "the daemon's logs before forking is made available in the exception" do
-    new_controller(start_command: "(echo hello world; false)")
-    begin
-      @controller.start
-    rescue DaemonController::StartError => e
-      expect(e.message).to eq("hello world\n(exited with status 1)")
-    end
-  end
-
-  specify "the daemon's logs after forking is made available in the exception" do
-    new_controller(crash_before_bind: true)
-    begin
-      @controller.start
-      fail
-    rescue DaemonController::StartError => e
-      expect(e.message).to include("crashing, as instructed")
-    end
-  end
-
-  specify "the daemon's exit signal is made available in the exception if the log file is a regular file" do
-    new_controller(crash_before_bind: true, crash_signal: "SIGXCPU", no_daemonize: true)
-    begin
-      @controller.start
-      fail
-    rescue DaemonController::StartError => e
-      expect(e.message).to include("crashing, as instructed")
-      expect(e.message).to include("SIGXCPU")
-    end
-  end
-
-  specify "the daemon's exit signal is made available in the exception if the log file is not a regular file" do
-    new_controller(crash_before_bind: true,
-      crash_signal: "SIGXCPU",
-      no_daemonize: true,
-      log_file: "/dev/stderr")
-    begin
-      @controller.start
-      fail
-    rescue DaemonController::StartError => e
-      expect(e.message).to include("logs not available")
-      expect(e.message).to include("SIGXCPU")
-    end
-  end
-
-  specify "the daemon's logs are not available if the log file is not a regular file" do
-    new_controller(crash_before_bind: true, log_file: "/dev/stderr")
-    begin
-      @controller.start
-      fail
-    rescue DaemonController::StartError => e
-      expect(e.message).to eq("(logs not available)")
-    end
-  end
-
-  specify "if the logs are available but empty, then the error exception says so" do
-    new_controller(start_command: "exit 1")
-    begin
-      @controller.start
-      fail
-    rescue DaemonController::StartError => e
-      expect(e.message).to eq("(logs empty; exited with status 1)")
+      specify "if logs cannot be captured, then the error says so" do
+        new_controller(log_message2: "hello world", wait2: 10, log_file: "/dev/stderr")
+        expect(@controller).to receive(:daemon_spawned) {
+          wait_until_pid_file_available
+          raise Timeout::Error
+        }
+        expect(@controller).to receive(:start_timed_out)
+        expect { @controller.start }.to raise_error(DaemonController::StartTimeout, /\(logs not available; timed out\)/)
+      end
     end
   end
 
@@ -358,7 +460,7 @@ describe DaemonController, "#start" do
     expect(ping_echo_server).to be true
   end
 
-  it "receives environment variables" do
+  it "passes environment variables" do
     new_controller(env: {"ENV_FILE" => "spec/env_file.tmp"})
     File.unlink("spec/env_file.tmp") if File.exist?("spec/env_file.tmp")
     @controller.start
@@ -391,13 +493,31 @@ describe DaemonController, "#stop" do
     end
   end
 
-  it "raises StopTimeout if the daemon does not stop in time" do
-    new_controller(stop_time: 0.3, stop_timeout: 0.1)
-    @controller.start
-    begin
-      expect { @controller.stop }.to raise_error(DaemonController::StopTimeout)
-    ensure
+  context "if the daemon does not stop in time" do
+    before :each do
+      new_controller(stop_time: 0.3, stop_timeout: 0.1)
+      @controller.start
+    end
+
+    after :each do
       new_controller.stop
+    end
+
+    it "raises StopTimeout" do
+      expect { @controller.stop }.to raise_error(DaemonController::StopTimeout)
+    end
+
+    it "forcefully terminates the daemon and raises StopTimeout" do
+      pid = @controller.pid
+      allow(Process).to receive(:kill).and_call_original
+      expect { @controller.stop }.to raise_error(DaemonController::StopTimeout)
+      expect(Process).to have_received(:kill).with("SIGKILL", pid).once
+      expect(File.exist?("spec/echo_server.pid")).to be(false)
+    end
+
+    it "deletes the PID file" do
+      expect { @controller.stop }.to raise_error(DaemonController::StopTimeout)
+      expect(File.exist?("spec/echo_server.pid")).to be(false)
     end
   end
 

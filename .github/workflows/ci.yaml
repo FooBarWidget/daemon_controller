@@ -26,7 +26,8 @@ jobs:
           bundler-cache: true
 
       - name: Run RSpec tests
-        run: bundle exec rake test
+        run: /usr/bin/timeout -s QUIT 120 bundle exec rake test
+        timeout-minutes: 3
         env:
           MRI_RUBY: "env RUBYOPT= RUBYLIB= /usr/bin/ruby"
 

@@ -39,6 +39,21 @@ trap("SIGQUIT") do
 end
 
 module TestHelper
+  def new_logger
+    @logger ||= begin
+      @log_stream = StringIO.new
+      logger = Logger.new(@log_stream)
+      logger.level = Logger::DEBUG
+      logger
+    end
+  end
+
+  def print_logs(example)
+    warn "----- LOGS FOR: #{example.full_description} ----"
+    warn @log_stream.string
+    warn "----- END LOGS -----"
+  end
+
   def new_controller(options = {})
     @start_command = String.new("./spec/run_in_mri_ruby echo_server.rb -l spec/echo_server.log")
     if (log_message1 = options.delete(:log_message1))
@@ -65,6 +80,9 @@ module TestHelper
     if options.delete(:no_daemonize)
       @start_command << " --no-daemonize"
     end
+    if options.delete(:ignore_sigterm)
+      @start_command << " --ignore-sigterm"
+    end
     if !options.delete(:no_write_pid_file)
       @start_command << " -P spec/echo_server.pid"
     end
@@ -75,7 +93,8 @@ module TestHelper
       pid_file: "spec/echo_server.pid",
       log_file: "spec/echo_server.log",
       start_timeout: 30,
-      stop_timeout: 30
+      stop_timeout: 30,
+      logger: new_logger
     }.merge(options)
     @controller = DaemonController.new(**new_options)
   end
@@ -85,6 +104,10 @@ module TestHelper
     true
   rescue SystemCallError
     false
+  end
+
+  def monotonic_time
+    Process.clock_gettime(Process::CLOCK_MONOTONIC)
   end
 
   def write_file(filename, contents)
@@ -105,8 +128,8 @@ module TestHelper
   end
 
   def eventually(deadline_duration = 1, check_interval = 0.05)
-    deadline = Time.now + deadline_duration
-    while Time.now < deadline
+    deadline = monotonic_time + deadline_duration
+    while monotonic_time < deadline
       if yield
         return
       else
@@ -114,6 +137,12 @@ module TestHelper
       end
     end
     raise "Time limit exceeded"
+  end
+
+  def wait_until_pid_file_available
+    eventually(30) do
+      @controller.send(:pid_file_available?)
+    end
   end
 
   def find_echo_server_pid

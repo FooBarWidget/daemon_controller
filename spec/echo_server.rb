@@ -55,6 +55,9 @@ parser = OptionParser.new do |opts|
   opts.on("--no-daemonize", "Don't daemonize.") do
     options[:daemonize] = false
   end
+  opts.on("--ignore-sigterm", "Ignore SIGTERM.") do
+    options[:ignore_sigterm] = true
+  end
 end
 begin
   parser.parse!
@@ -76,6 +79,12 @@ if options[:log_message1]
   puts options[:log_message1]
   $stdout.flush
 end
+
+if options[:ignore_sigterm]
+  Signal.trap("SIGTERM", "IGNORE")
+end
+
+sleep(options[:wait1])
 
 if ENV["ENV_FILE"]
   options[:env_file] = File.absolute_path(ENV["ENV_FILE"])
@@ -104,7 +113,6 @@ def main(options)
   end
 
   if options[:pid_file]
-    sleep(options[:wait1])
     File.open(options[:pid_file], "w") do |f|
       f.puts(Process.pid)
     end

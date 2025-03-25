@@ -63,23 +63,18 @@ class DaemonController
   class ConnectError < Error
   end
 
-  # Internal, not publicly thrown.
-  class DaemonizationTimeout < TimeoutError
-    attr_reader :output
-
-    def initialize(output)
-      super()
-      @output = output
-    end
-  end
+  InternalCommandOkResult = Struct.new(:pid, :output)
+  InternalCommandErrorResult = Struct.new(:pid, :output, :exit_status)
+  InternalCommandTimeoutResult = Struct.new(:pid, :output)
 
   # Create a new DaemonController object.
   #
   # See doc/OPTIONS.md for options docs.
   def initialize(identifier:, start_command:, ping_command:, pid_file:, log_file:,
     lock_file: nil, stop_command: nil, restart_command: nil, before_start: nil,
-    start_timeout: 30, stop_timeout: 30, log_file_activity_timeout: 10, ping_interval: 0.1,
-    dont_stop_if_pid_file_invalid: false, daemonize_for_me: false, keep_ios: nil, env: nil)
+    start_timeout: 30, start_abort_timeout: 10, stop_timeout: 30,
+    log_file_activity_timeout: 10, ping_interval: 0.1, stop_graceful_signal: "TERM", dont_stop_if_pid_file_invalid: false,
+    daemonize_for_me: false, keep_ios: nil, env: nil, logger: nil)
     @identifier = identifier
     @start_command = start_command
     @ping_command = ping_command
@@ -91,13 +86,16 @@ class DaemonController
     @restart_command = restart_command
     @before_start = before_start
     @start_timeout = start_timeout
+    @start_abort_timeout = start_abort_timeout
     @stop_timeout = stop_timeout
     @log_file_activity_timeout = log_file_activity_timeout
     @ping_interval = ping_interval
+    @stop_graceful_signal = stop_graceful_signal
     @dont_stop_if_pid_file_invalid = dont_stop_if_pid_file_invalid
     @daemonize_for_me = daemonize_for_me
     @keep_ios = keep_ios
     @env = env
+    @logger = logger
   end
 
   # Start the daemon and wait until it can be pinged.
@@ -179,15 +177,17 @@ class DaemonController
   # - StopTimeout - the daemon didn't stop in time.
   def stop
     @lock_file.exclusive_lock do
-      Timeout.timeout(@stop_timeout, Timeout::Error) do
-        kill_daemon
-        wait_until do
-          !daemon_is_running?
+      timeoutable(@stop_timeout) do
+        allow_timeout do
+          kill_daemon
+          wait_until { !daemon_is_running? }
         end
       end
-    rescue Timeout::Error
-      raise StopTimeout, "Daemon '#{@identifier}' did not exit in time"
     end
+  rescue Timeout::Error
+    kill_daemon_with_signal(force: true)
+    wait_until { !daemon_is_running? }
+    raise StopTimeout, "Daemon '#{@identifier}' did not exit in time (force killed)"
   end
 
   # Restarts the daemon. Uses the restart_command if provided, otherwise
@@ -236,66 +236,86 @@ class DaemonController
   private
 
   def start_without_locking
-    if daemon_is_running?
-      raise AlreadyStarted, "Daemon '#{@identifier}' is already started"
-    end
+    raise AlreadyStarted, "Daemon '#{@identifier}' is already started" if daemon_is_running?
+
     save_log_file_information
     delete_pid_file
+    spawn_result = nil
+
     begin
-      started = false
-      before_start
-      Timeout.timeout(@start_timeout, Timeout::Error) do
-        spawn_daemon
+      _, remaining_time = timeoutable(@start_timeout) do
+        allow_timeout { before_start }
+        spawn_result = allow_timeout { spawn_daemon }
+        daemon_spawned
         record_activity
 
-        # We wait until the PID file is available and until
-        # the daemon responds to pings, but we wait no longer
-        # than @start_timeout seconds in total (including daemon
-        # spawn time).
-        # Furthermore, if the log file hasn't changed for
-        # @log_file_activity_timeout seconds, and the PID file
-        # still isn't available or the daemon still doesn't
-        # respond to pings, then assume that the daemon has
-        # terminated with an error.
-        wait_until do
-          if log_file_has_changed?
-            record_activity
-          elsif no_activity?(@log_file_activity_timeout)
-            raise Timeout::Error, "Log file inactivity"
+        if spawn_result.is_a?(InternalCommandOkResult)
+          allow_timeout do
+            # We wait until the PID file is available and until
+            # the daemon responds to pings, but we wait no longer
+            # than @start_timeout seconds in total (including daemon
+            # spawn time).
+            # Furthermore, if the log file hasn't changed for
+            # @log_file_activity_timeout seconds, and the PID file
+            # still isn't available or the daemon still doesn't
+            # respond to pings, then assume that the daemon has
+            # terminated with an error.
+            wait_until do
+              if log_file_has_changed?
+                record_activity
+              elsif no_activity?(@log_file_activity_timeout)
+                raise Timeout::Error, "Log file inactivity"
+              end
+              pid_file_available?
+            end
+            wait_until(sleep_interval: @ping_interval) do
+              if log_file_has_changed?
+                record_activity
+              elsif no_activity?(@log_file_activity_timeout)
+                raise Timeout::Error, "Log file inactivity"
+              end
+              run_ping_command || !daemon_is_running?
+            end
           end
-          pid_file_available?
         end
-        wait_until(@ping_interval) do
-          if log_file_has_changed?
-            record_activity
-          elsif no_activity?(@log_file_activity_timeout)
-            raise Timeout::Error, "Log file inactivity"
-          end
-          run_ping_command || !daemon_is_running?
-        end
-        started = run_ping_command
+
+        spawn_result
       end
-      result = started
-    rescue DaemonizationTimeout, Timeout::Error => e
-      start_timed_out
-      if pid_file_available?
-        kill_daemon_with_signal(true)
-      end
-      result = if e.is_a?(DaemonizationTimeout)
-        :daemonization_timeout
-      else
-        :start_timeout
-      end
+    rescue Timeout::Error
+      # If we got here then it means either the #before_start timed out (= no PID),
+      # or the code after #spawn_daemon timed out (already daemonized, so use PID file).
+      # #spawn_daemon itself won't trigger Timeout:Error because that's handled as
+      # InternalCommandTimeoutResult.
+      pid = spawn_result ? read_pid_file : nil
+      start_timed_out(pid)
+      debug "Timeout waiting for daemon to be ready, PID #{pid.inspect}"
+      abort_start(pid: pid, is_direct_child: false) if pid
+      raise StartTimeout, concat_spawn_output_and_logs(spawn_result ? spawn_result.output : nil,
+        differences_in_log_file, nil, "timed out")
     end
 
-    if !result
-      raise StartError, concat_spawn_output_and_logs(@spawn_output, differences_in_log_file)
-    elsif result == :daemonization_timeout
-      raise StartTimeout, concat_spawn_output_and_logs(@spawn_output, differences_in_log_file, nil, "timed out")
-    elsif result == :start_timeout
-      raise StartTimeout, concat_spawn_output_and_logs(@spawn_output, differences_in_log_file, nil, "timed out")
+    case spawn_result
+    when InternalCommandOkResult
+      success, _ = timeoutable(remaining_time) { allow_timeout { run_ping_command } }
+      if success
+        true
+      else
+        raise StartError, concat_spawn_output_and_logs(spawn_result.output, differences_in_log_file)
+      end
+
+    when InternalCommandErrorResult
+      raise StartError, concat_spawn_output_and_logs(spawn_result.output,
+        differences_in_log_file, spawn_result.exit_status)
+
+    when InternalCommandTimeoutResult
+      daemonization_timed_out(spawn_result.pid)
+      abort_start(pid: spawn_result.pid, is_direct_child: true)
+      debug "Timeout waiting for daemon to fork, PID #{spawn_result.pid}"
+      raise StartTimeout, concat_spawn_output_and_logs(spawn_result.output,
+        differences_in_log_file, nil, "timed out")
+
     else
-      true
+      raise "Bug: unexpected result from #spawn_daemon: #{spawn_result.inspect}"
     end
   end
 
@@ -306,14 +326,11 @@ class DaemonController
   end
 
   def spawn_daemon
-    @spawn_output = if @start_command.respond_to?(:call)
+    if @start_command.respond_to?(:call)
       run_command(@start_command.call)
     else
       run_command(@start_command)
     end
-  rescue DaemonizationTimeout => e
-    @spawn_output = e.output
-    raise e
   end
 
   def kill_daemon
@@ -321,37 +338,37 @@ class DaemonController
       if @dont_stop_if_pid_file_invalid && read_pid_file.nil?
         return
       end
-      begin
-        run_command(@stop_command)
-      rescue StartError => e
-        raise StopError, e.message
+
+      result = run_command(@stop_command)
+      case result
+      when InternalCommandOkResult
+        # Success
+      when InternalCommandErrorResult
+        raise StopError, concat_spawn_output_and_logs(result.output, nil, result.exit_status)
+      when InternalCommandTimeoutResult
+        raise StopError, concat_spawn_output_and_logs(result.output, nil, nil, "timed out")
+      else
+        raise "Bug: unexpected result from #run_command: #{result.inspect}"
       end
     else
       kill_daemon_with_signal
     end
   end
 
-  def kill_daemon_with_signal(force = false)
+  def kill_daemon_with_signal(force: false)
     pid = read_pid_file
     if pid
       if force
         Process.kill("SIGKILL", pid)
       else
-        Process.kill("SIGTERM", pid)
+        Process.kill(normalize_signal_name(@stop_graceful_signal), pid)
       end
     end
   rescue Errno::ESRCH, Errno::ENOENT
   end
 
   def daemon_is_running?
-    begin
-      pid = read_pid_file
-    rescue Errno::ENOENT
-      # The PID file may not exist, or another thread/process
-      # executing #running? may have just deleted the PID file.
-      # So we catch this error.
-      return nil
-    end
+    pid = read_pid_file
     if pid.nil?
       nil
     elsif check_pid(pid)
@@ -391,7 +408,7 @@ class DaemonController
     true
   end
 
-  def wait_until(sleep_interval = 0.1)
+  def wait_until(sleep_interval: 0.1)
     until yield
       sleep(sleep_interval)
     end
@@ -425,11 +442,81 @@ class DaemonController
   end
 
   # This method does nothing and only serves as a hook for the unit test.
-  def start_timed_out
+  def daemon_spawned
   end
 
   # This method does nothing and only serves as a hook for the unit test.
-  def daemonization_timed_out
+  def start_timed_out(pid)
+  end
+
+  # This method does nothing and only serves as a hook for the unit test.
+  def daemonization_timed_out(pid)
+  end
+
+  # Aborts a daemon that we tried to start, but timed out.
+  def abort_start(pid:, is_direct_child:)
+    begin
+      debug "Killing process #{pid}"
+      Process.kill("SIGTERM", pid)
+    rescue SystemCallError
+    end
+
+    begin
+      timeoutable(@start_abort_timeout) do
+        allow_timeout do
+          if is_direct_child
+            begin
+              debug "Waiting directly for process #{pid}"
+              Process.waitpid(pid)
+            rescue SystemCallError
+            end
+
+            # The daemon may have:
+            # 1. Written a PID file before forking. We delete this PID file.
+            #    -OR-
+            # 2. It might have forked (and written a PID file) right before
+            #    we terminated it. We'll want the fork to stay alive rather
+            #    than going through the (complicated) trouble of killing it.
+            #    Don't touch the PID file.
+            pid2 = read_pid_file
+            debug "PID file contains #{pid2.inspect}"
+            delete_pid_file if pid == pid2
+          else
+            debug "Waiting until daemon is no longer running"
+            wait_until { !daemon_is_running? }
+          end
+        end
+      end
+    rescue Timeout::Error
+      begin
+        Process.kill("SIGKILL", pid)
+      rescue SystemCallError
+      end
+
+      allow_timeout do
+        if is_direct_child
+          begin
+            debug "Waiting directly for process #{pid}"
+            Process.waitpid(pid)
+          rescue SystemCallError
+          end
+
+          # The daemon may have:
+          # 1. Written a PID file before forking. We delete this PID file.
+          #    -OR-
+          # 2. It might have forked (and written a PID file) right before
+          #    we terminated it. We'll want the fork to stay alive rather
+          #    than going through the (complicated) trouble of killing it.
+          #    Don't touch the PID file.
+          pid2 = read_pid_file
+          debug "PID file contains #{pid2.inspect}"
+          delete_pid_file if pid == pid2
+        else
+          debug "Waiting until daemon is no longer running"
+          wait_until { !daemon_is_running? }
+        end
+      end
+    end
   end
 
   def save_log_file_information
@@ -483,9 +570,68 @@ class DaemonController
 
   def run_command(command)
     if should_capture_output_while_running_command?
-      run_command_while_capturing_output(command)
+      # Create tempfile for storing the command's output.
+      tempfile = Tempfile.new("daemon-output")
+      tempfile.chmod(0o666)
+      tempfile_path = tempfile.path
+      tempfile.close
+
+      spawn_options = {
+        in: "/dev/null",
+        out: tempfile_path,
+        err: tempfile_path,
+        close_others: true
+      }
     else
-      run_command_without_capturing_output(command)
+      spawn_options = {
+        in: "/dev/null",
+        out: :out,
+        err: :err,
+        close_others: true
+      }
+    end
+
+    if @keep_ios
+      @keep_ios.each do |io|
+        spawn_options[io] = io
+      end
+    end
+
+    pid = if @daemonize_for_me
+      Process.spawn(@env || {}, ruby_interpreter, SPAWNER_FILE,
+        command, spawn_options)
+    else
+      Process.spawn(@env || {}, command, spawn_options)
+    end
+
+    # run_command might be running in a timeout block (like
+    # in #start_without_locking).
+    begin
+      Process.waitpid(pid)
+    rescue Errno::ECHILD
+      # Maybe a background thread or whatever waitpid()'ed
+      # this child process before we had the chance. There's
+      # no way to obtain the exit status now. Assume that
+      # it started successfully; if it didn't we'll know
+      # that later by checking the PID file and by pinging
+      # it.
+      return InternalCommandOkResult.new(pid, tempfile_path ? File.read(tempfile_path).strip : nil)
+    rescue Timeout::Error
+      return InternalCommandTimeoutResult.new(pid, tempfile_path ? File.read(tempfile_path).strip : nil)
+    end
+
+    child_status = $?
+    output = File.read(tempfile_path).strip if tempfile_path
+    if child_status.success?
+      InternalCommandOkResult.new(pid, output)
+    else
+      InternalCommandErrorResult.new(pid, output, child_status)
+    end
+  ensure
+    begin
+      File.unlink(tempfile_path) if tempfile_path
+    rescue SystemCallError
+      nil
     end
   end
 
@@ -512,140 +658,6 @@ class DaemonController
       path == "/dev/fd/1" ||
       path == "/dev/fd/2" ||
       path =~ %r{\A/proc/([0-9]+|self)/fd/[12]\Z}
-  end
-
-  def run_command_while_capturing_output(command)
-    # Create tempfile for storing the command's output.
-    tempfile = Tempfile.new("daemon-output")
-    tempfile.chmod(0o666)
-    tempfile_path = tempfile.path
-    tempfile.close
-
-    options = {
-      in: "/dev/null",
-      out: tempfile_path,
-      err: tempfile_path,
-      close_others: true
-    }
-    if @keep_ios
-      @keep_ios.each do |io|
-        options[io] = io
-      end
-    end
-    pid = if @daemonize_for_me
-      Process.spawn(@env || {}, ruby_interpreter, SPAWNER_FILE,
-        command, options)
-    else
-      Process.spawn(@env || {}, command, options)
-    end
-
-    # run_command might be running in a timeout block (like
-    # in #start_without_locking).
-    begin
-      interruptable_waitpid(pid)
-    rescue Errno::ECHILD
-      # Maybe a background thread or whatever waitpid()'ed
-      # this child process before we had the chance. There's
-      # no way to obtain the exit status now. Assume that
-      # it started successfully; if it didn't we'll know
-      # that later by checking the PID file and by pinging
-      # it.
-      return
-    rescue Timeout::Error
-      daemonization_timed_out
-
-      # If the daemon doesn't fork into the background
-      # in time, then kill it.
-      begin
-        Process.kill("SIGTERM", pid)
-      rescue SystemCallError
-      end
-      begin
-        Timeout.timeout(5, Timeout::Error) do
-          interruptable_waitpid(pid)
-        rescue SystemCallError
-        end
-      rescue Timeout::Error
-        begin
-          Process.kill("SIGKILL", pid)
-          interruptable_waitpid(pid)
-        rescue SystemCallError
-        end
-      end
-      raise DaemonizationTimeout, File.read(tempfile_path).strip
-    end
-
-    output = File.read(tempfile_path).strip
-    if $?.exitstatus != 0
-      raise StartError, concat_spawn_output_and_logs(output, differences_in_log_file, $?)
-    else
-      output
-    end
-  ensure
-    begin
-      File.unlink(tempfile_path)
-    rescue
-      nil
-    end
-  end
-
-  def run_command_without_capturing_output(command)
-    options = {
-      in: "/dev/null",
-      out: :out,
-      err: :err,
-      close_others: true
-    }
-    if @keep_ios
-      @keep_ios.each do |io|
-        options[io] = io
-      end
-    end
-    pid = if @daemonize_for_me
-      Process.spawn(@env || {}, ruby_interpreter, SPAWNER_FILE,
-        command, options)
-    else
-      Process.spawn(@env || {}, command, options)
-    end
-
-    # run_command might be running in a timeout block (like
-    # in #start_without_locking).
-    begin
-      interruptable_waitpid(pid)
-    rescue Errno::ECHILD
-      # Maybe a background thread or whatever waitpid()'ed
-      # this child process before we had the chance. There's
-      # no way to obtain the exit status now. Assume that
-      # it started successfully; if it didn't we'll know
-      # that later by checking the PID file and by pinging
-      # it.
-      return
-    rescue Timeout::Error
-      daemonization_timed_out
-
-      # If the daemon doesn't fork into the background
-      # in time, then kill it.
-      begin
-        Process.kill("SIGTERM", pid)
-      rescue SystemCallError
-      end
-      begin
-        Timeout.timeout(5, Timeout::Error) do
-          interruptable_waitpid(pid)
-        rescue SystemCallError
-        end
-      rescue Timeout::Error
-        begin
-          Process.kill("SIGKILL", pid)
-          interruptable_waitpid(pid)
-        rescue SystemCallError
-        end
-      end
-      raise DaemonizationTimeout, nil
-    end
-    if $?.exitstatus != 0
-      raise StartError, concat_spawn_output_and_logs(nil, differences_in_log_file, $?)
-    end
   end
 
   def run_ping_command
@@ -777,17 +789,20 @@ class DaemonController
     ) + rb_config["EXEEXT"]
   end
 
-  # Thread#kill (which is called by timeout.rb) may
-  # not be able to interrupt Process.waitpid. So here we use a
-  # special version that's a bit less efficient but is at least
-  # interruptable.
-  def interruptable_waitpid(pid)
-    result = nil
-    until result
-      result = Process.waitpid(pid, Process::WNOHANG)
-      sleep 0.01 if !result
+  def timeoutable(amount, &block)
+    Thread.handle_interrupt(Timeout::Error => :never) do
+      start_time = monotonic_time
+      result = Timeout.timeout(amount, Timeout::Error, &block)
+      [result, [monotonic_time - start_time, 0].max]
     end
-    result
+  end
+
+  def allow_timeout(&block)
+    Thread.handle_interrupt(Timeout::Error => :on_blocking, &block)
+  end
+
+  def monotonic_time
+    Process.clock_gettime(Process::CLOCK_MONOTONIC)
   end
 
   def signal_termination_message(process_status)
@@ -796,6 +811,10 @@ class DaemonController
     else
       "exited with status #{process_status.exitstatus}"
     end
+  end
+
+  def normalize_signal_name(name)
+    name.start_with?("SIG") ? name : "SIG#{name}"
   end
 
   def signal_name_for(num)
@@ -832,5 +851,9 @@ class DaemonController
       end
       result
     end
+  end
+
+  def debug(message)
+    @logger.debug(message) if @logger
   end
 end
