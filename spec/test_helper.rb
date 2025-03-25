@@ -40,7 +40,7 @@ end
 
 module TestHelper
   def new_controller(options = {})
-    @start_command = String.new("./spec/run_echo_server -l spec/echo_server.log")
+    @start_command = String.new("./spec/run_in_mri_ruby echo_server.rb -l spec/echo_server.log")
     if (log_message1 = options.delete(:log_message1))
       @start_command << " --log-message1 #{Shellwords.escape log_message1}"
     end

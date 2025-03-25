@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -e
+dir=$(dirname "$0")
+dir=$(cd "$dir"; pwd)
+if [[ -n "$MRI_RUBY" ]]; then
+	exec $MRI_RUBY "$dir/$1" "$@"
+else
+	echo 'In order to run echo_server, you must set the environment variable $MRI_RUBY.' >&2
+	exit 1
+fi
