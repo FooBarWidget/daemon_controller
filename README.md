@@ -498,5 +498,6 @@ synchronization. This has a few implications:
 API documentation
 =================
 
-Detailed API documentation is available in the form of inline comments in
-`lib/daemon_controller.rb`.
+Detailed API documentation is available here:
+- [Configuration options](doc/OPTIONS.md)
+- Inline comments in `lib/daemon_controller.rb`.
