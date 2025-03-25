@@ -87,6 +87,10 @@ module TestHelper
     false
   end
 
+  def monotonic_time
+    Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  end
+
   def write_file(filename, contents)
     File.write(filename, contents)
   end

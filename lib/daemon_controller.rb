@@ -64,11 +64,12 @@ class DaemonController
   end
 
   # Internal, not publicly thrown.
-  class DaemonizationTimeout < TimeoutError
-    attr_reader :output
+  class InternalDaemonizationTimeout < TimeoutError
+    attr_reader :pid, :output
 
-    def initialize(output)
+    def initialize(pid:, output:)
       super()
+      @pid = pid
       @output = output
     end
   end
@@ -78,8 +79,9 @@ class DaemonController
   # See doc/OPTIONS.md for options docs.
   def initialize(identifier:, start_command:, ping_command:, pid_file:, log_file:,
     lock_file: nil, stop_command: nil, restart_command: nil, before_start: nil,
-    start_timeout: 30, stop_timeout: 30, log_file_activity_timeout: 10, ping_interval: 0.1,
-    dont_stop_if_pid_file_invalid: false, daemonize_for_me: false, keep_ios: nil, env: nil)
+    start_timeout: 30, start_abort_timeout: 10, stop_timeout: 30, log_file_activity_timeout: 10,
+    ping_interval: 0.1, stop_graceful_signal: "TERM", dont_stop_if_pid_file_invalid: false,
+    daemonize_for_me: false, keep_ios: nil, env: nil)
     @identifier = identifier
     @start_command = start_command
     @ping_command = ping_command
@@ -91,9 +93,11 @@ class DaemonController
     @restart_command = restart_command
     @before_start = before_start
     @start_timeout = start_timeout
+    @start_abort_timeout = start_abort_timeout
     @stop_timeout = stop_timeout
     @log_file_activity_timeout = log_file_activity_timeout
     @ping_interval = ping_interval
+    @stop_graceful_signal = stop_graceful_signal
     @dont_stop_if_pid_file_invalid = dont_stop_if_pid_file_invalid
     @daemonize_for_me = daemonize_for_me
     @keep_ios = keep_ios
@@ -181,13 +185,13 @@ class DaemonController
     @lock_file.exclusive_lock do
       Timeout.timeout(@stop_timeout, Timeout::Error) do
         kill_daemon
-        wait_until do
-          !daemon_is_running?
-        end
+        wait_until { !daemon_is_running? }
       end
-    rescue Timeout::Error
-      raise StopTimeout, "Daemon '#{@identifier}' did not exit in time"
     end
+  rescue Timeout::Error
+    kill_daemon_with_signal(force: true)
+    wait_until { !daemon_is_running? }
+    raise StopTimeout, "Daemon '#{@identifier}' did not exit in time (force killed)"
   end
 
   # Restarts the daemon. Uses the restart_command if provided, otherwise
@@ -276,16 +280,15 @@ class DaemonController
         started = run_ping_command
       end
       result = started
-    rescue DaemonizationTimeout, Timeout::Error => e
-      start_timed_out
-      if pid_file_available?
-        kill_daemon_with_signal(true)
-      end
-      result = if e.is_a?(DaemonizationTimeout)
-        :daemonization_timeout
-      else
-        :start_timeout
-      end
+    rescue InternalDaemonizationTimeout => e
+      start_timed_out(e.pid)
+      abort_start(pid: e.pid, is_direct_child: true)
+      result = :daemonization_timeout
+    rescue Timeout::Error
+      pid = read_pid_file
+      start_timed_out(pid)
+      abort_start(pid: pid, is_direct_child: false) if pid
+      result = :start_timeout
     end
 
     if !result
@@ -311,7 +314,7 @@ class DaemonController
     else
       run_command(@start_command)
     end
-  rescue DaemonizationTimeout => e
+  rescue InternalDaemonizationTimeout => e
     @spawn_output = e.output
     raise e
   end
@@ -331,13 +334,13 @@ class DaemonController
     end
   end
 
-  def kill_daemon_with_signal(force = false)
+  def kill_daemon_with_signal(force: false)
     pid = read_pid_file
     if pid
       if force
         Process.kill("SIGKILL", pid)
       else
-        Process.kill("SIGTERM", pid)
+        Process.kill(normalize_signal_name(@stop_graceful_signal), pid)
       end
     end
   rescue Errno::ESRCH, Errno::ENOENT
@@ -425,11 +428,46 @@ class DaemonController
   end
 
   # This method does nothing and only serves as a hook for the unit test.
-  def start_timed_out
+  def start_timed_out(pid)
   end
 
   # This method does nothing and only serves as a hook for the unit test.
   def daemonization_timed_out
+  end
+
+  # Aborts a daemon that we tried to start, but timed out.
+  def abort_start(pid:, is_direct_child:)
+    begin
+      Process.kill("SIGTERM", pid)
+    rescue SystemCallError
+    end
+
+    begin
+      Timeout.timeout(@start_abort_timeout, Timeout::Error) do
+        if is_direct_child
+          begin
+            interruptable_waitpid(pid)
+          rescue SystemCallError
+          end
+        else
+          wait_until { !daemon_is_running? }
+        end
+      end
+    rescue Timeout::Error
+      begin
+        Process.kill("SIGKILL", pid)
+      rescue SystemCallError
+      end
+
+      if is_direct_child
+        begin
+          interruptable_waitpid(pid)
+        rescue SystemCallError
+        end
+      else
+        wait_until { !daemon_is_running? }
+      end
+    end
   end
 
   def save_log_file_information
@@ -552,27 +590,8 @@ class DaemonController
       # it.
       return
     rescue Timeout::Error
-      daemonization_timed_out
-
-      # If the daemon doesn't fork into the background
-      # in time, then kill it.
-      begin
-        Process.kill("SIGTERM", pid)
-      rescue SystemCallError
-      end
-      begin
-        Timeout.timeout(5, Timeout::Error) do
-          interruptable_waitpid(pid)
-        rescue SystemCallError
-        end
-      rescue Timeout::Error
-        begin
-          Process.kill("SIGKILL", pid)
-          interruptable_waitpid(pid)
-        rescue SystemCallError
-        end
-      end
-      raise DaemonizationTimeout, File.read(tempfile_path).strip
+      daemonization_timed_out(pid)
+      raise InternalDaemonizationTimeou.new(pid: pid, output: File.read(tempfile_path).strip)
     end
 
     output = File.read(tempfile_path).strip
@@ -621,27 +640,8 @@ class DaemonController
       # it.
       return
     rescue Timeout::Error
-      daemonization_timed_out
-
-      # If the daemon doesn't fork into the background
-      # in time, then kill it.
-      begin
-        Process.kill("SIGTERM", pid)
-      rescue SystemCallError
-      end
-      begin
-        Timeout.timeout(5, Timeout::Error) do
-          interruptable_waitpid(pid)
-        rescue SystemCallError
-        end
-      rescue Timeout::Error
-        begin
-          Process.kill("SIGKILL", pid)
-          interruptable_waitpid(pid)
-        rescue SystemCallError
-        end
-      end
-      raise DaemonizationTimeout, nil
+      daemonization_timed_out(pid)
+      raise InternalDaemonizationTimeout.new(pid: pid, output: nil)
     end
     if $?.exitstatus != 0
       raise StartError, concat_spawn_output_and_logs(nil, differences_in_log_file, $?)
@@ -796,6 +796,10 @@ class DaemonController
     else
       "exited with status #{process_status.exitstatus}"
     end
+  end
+
+  def normalize_signal_name(name)
+    name.start_with?("SIG") ? name : "SIG#{name}"
   end
 
   def signal_name_for(num)

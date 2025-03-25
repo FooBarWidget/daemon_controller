@@ -500,4 +500,5 @@ API documentation
 
 Detailed API documentation is available here:
 - [Configuration options](doc/OPTIONS.md)
+- [Stop flow](doc/STOP_FLOW.md)
 - Inline comments in `lib/daemon_controller.rb`.

@@ -71,7 +71,8 @@ Lock file to use for serializing concurrent daemon management operations.
 Command to stop the daemon with, e.g. "/etc/rc.d/nginx stop".
 
 If no stop command is given (i.e., `nil`), then will stop the daemon
-by sending signals to the PID written in the PID file.
+by sending signals to the PID written in the PID file. See
+[Stop flow](STOP-FLOW.md) for how that works.
 
 ### restart_command (default: nil)
 
@@ -89,7 +90,15 @@ The Proc call is not subject to the start timeout.
 Maximum amount of time (seconds) that #start may take to start
 the daemon. Since #start also waits until the daemon can be connected to,
 that wait time is counted as well. If the daemon does not start in time,
-then #start will raise an exception and also stop the daemon.
+then #start will raise an exception and also stop the daemon. See also
+[Stop flow](STOP-FLOW.md) for how that works.
+
+### start_abort_timeout (default: 10)
+
+Maximum amount of time (seconds) to wait for the daemon to terminate after
+sending SIGTERM during the start timeout flow. If the daemon does not terminate
+within this time, it will be forcefully terminated with SIGKILL. See
+[Stop flow](STOP-FLOW.md) for more details.
 
 ### stop_timeout (default: 30)
 
@@ -97,6 +106,8 @@ Maximum amount of time (seconds) that #stop may take to stop
 the daemon. Since #stop also waits until the daemon is no longer running,
 that wait time is counted as well. If the daemon does not stop in time,
 then #stop will raise an exception and force stop the daemon.
+
+See [Stop flow](STOP-FLOW.md) for al overview of the entire stopping flow.
 
 ### log_file_activity_timeout (default: 10)
 
@@ -116,6 +127,12 @@ given by this option, then the daemon is assumed to have terminated with an erro
 
 Time interval (seconds) between pinging attempts (see `ping_command`) when waiting
 for the daemon to start.
+
+### stop_graceful_signal (default: "TERM")
+
+Signal to send to the daemon when attempting to stop it gracefully during `#stop`
+(regular stop flow). This is only used when no `stop_command` is provided.
+See [Stop flow](STOP-FLOW.md) for more details.
 
 ### dont_stop_if_pid_file_invalid (default: false)
 
