@@ -74,6 +74,10 @@ class DaemonController
     end
   end
 
+  InternalCommandOkResult = Struct.new(:pid, :output)
+  InternalCommandErrorResult = Struct.new(:pid, :output, :exit_status)
+  InternalCommandTimeoutResult = Struct.new(:pid, :output)
+
   # Create a new DaemonController object.
   #
   # See doc/OPTIONS.md for options docs.
@@ -240,16 +244,32 @@ class DaemonController
   private
 
   def start_without_locking
-    if daemon_is_running?
-      raise AlreadyStarted, "Daemon '#{@identifier}' is already started"
-    end
+    raise AlreadyStarted, "Daemon '#{@identifier}' is already started" if daemon_is_running?
+
     save_log_file_information
     delete_pid_file
+
+    begin
+      timeoutable(@start_timeout) do
+        allow_timeout { before_start }
+        spawn_result = allow_timeout { spawn_daemon }
+        case spawn_result
+        when InternalCommandOkResult
+        when InternalCommandErrorResult
+        when InternalCommandTimeoutResult
+
+        else
+          raise "Bug: unexpected result from #spawn_daemon: #{spawn_result.inspect}"
+        end
+      end
+    rescue Timeout::Error
+    end
+
     begin
       started = false
       before_start
       Timeout.timeout(@start_timeout, Timeout::Error) do
-        spawn_daemon
+        spawn_result = spawn_daemon
         record_activity
 
         # We wait until the PID file is available and until
@@ -309,14 +329,11 @@ class DaemonController
   end
 
   def spawn_daemon
-    @spawn_output = if @start_command.respond_to?(:call)
+    if @start_command.respond_to?(:call)
       run_command(@start_command.call)
     else
       run_command(@start_command)
     end
-  rescue InternalDaemonizationTimeout => e
-    @spawn_output = e.output
-    raise e
   end
 
   def kill_daemon
@@ -446,7 +463,7 @@ class DaemonController
       Timeout.timeout(@start_abort_timeout, Timeout::Error) do
         if is_direct_child
           begin
-            interruptable_waitpid(pid)
+            Process.waitpid(pid)
           rescue SystemCallError
           end
         else
@@ -461,7 +478,7 @@ class DaemonController
 
       if is_direct_child
         begin
-          interruptable_waitpid(pid)
+          Process.waitpid(pid)
         rescue SystemCallError
         end
       else
@@ -521,9 +538,69 @@ class DaemonController
 
   def run_command(command)
     if should_capture_output_while_running_command?
-      run_command_while_capturing_output(command)
+      # Create tempfile for storing the command's output.
+      tempfile = Tempfile.new("daemon-output")
+      tempfile.chmod(0o666)
+      tempfile_path = tempfile.path
+      tempfile.close
+
+      spawn_options = {
+        in: "/dev/null",
+        out: tempfile_path,
+        err: tempfile_path,
+        close_others: true
+      }
     else
-      run_command_without_capturing_output(command)
+      spawn_options = {
+        in: "/dev/null",
+        out: :out,
+        err: :err,
+        close_others: true
+      }
+    end
+
+    if @keep_ios
+      @keep_ios.each do |io|
+        options[io] = io
+      end
+    end
+
+    pid = if @daemonize_for_me
+      Process.spawn(@env || {}, ruby_interpreter, SPAWNER_FILE,
+        command, spawn_options)
+    else
+      Process.spawn(@env || {}, command, spawn_options)
+    end
+
+    # run_command might be running in a timeout block (like
+    # in #start_without_locking).
+    begin
+      Process.waitpid(pid)
+    rescue Errno::ECHILD
+      # Maybe a background thread or whatever waitpid()'ed
+      # this child process before we had the chance. There's
+      # no way to obtain the exit status now. Assume that
+      # it started successfully; if it didn't we'll know
+      # that later by checking the PID file and by pinging
+      # it.
+      return InternalCommandOkResult.new(pid, tempfile_path ? File.read(tempfile_path).strip : nil)
+    rescue Timeout::Error
+      daemonization_timed_out(pid)
+      return InternalCommandTimeoutResult.new(pid, tempfile_path ? File.read(tempfile_path).strip : nil)
+    end
+
+    child_status = $CHILD_STATUS
+    output = File.read(tempfile_path).strip if tempfile_path
+    if child_status.success?
+      InternalCommandOkResult.new(pid, output)
+    else
+      InternalCommandErrorResult.new(pid, output, child_status)
+    end
+  ensure
+    begin
+      File.unlink(tempfile_path) if tempfile_path
+    rescue SystemCallError
+      nil
     end
   end
 
@@ -550,102 +627,6 @@ class DaemonController
       path == "/dev/fd/1" ||
       path == "/dev/fd/2" ||
       path =~ %r{\A/proc/([0-9]+|self)/fd/[12]\Z}
-  end
-
-  def run_command_while_capturing_output(command)
-    # Create tempfile for storing the command's output.
-    tempfile = Tempfile.new("daemon-output")
-    tempfile.chmod(0o666)
-    tempfile_path = tempfile.path
-    tempfile.close
-
-    options = {
-      in: "/dev/null",
-      out: tempfile_path,
-      err: tempfile_path,
-      close_others: true
-    }
-    if @keep_ios
-      @keep_ios.each do |io|
-        options[io] = io
-      end
-    end
-    pid = if @daemonize_for_me
-      Process.spawn(@env || {}, ruby_interpreter, SPAWNER_FILE,
-        command, options)
-    else
-      Process.spawn(@env || {}, command, options)
-    end
-
-    # run_command might be running in a timeout block (like
-    # in #start_without_locking).
-    begin
-      interruptable_waitpid(pid)
-    rescue Errno::ECHILD
-      # Maybe a background thread or whatever waitpid()'ed
-      # this child process before we had the chance. There's
-      # no way to obtain the exit status now. Assume that
-      # it started successfully; if it didn't we'll know
-      # that later by checking the PID file and by pinging
-      # it.
-      return
-    rescue Timeout::Error
-      daemonization_timed_out(pid)
-      raise InternalDaemonizationTimeou.new(pid: pid, output: File.read(tempfile_path).strip)
-    end
-
-    output = File.read(tempfile_path).strip
-    if $?.exitstatus != 0
-      raise StartError, concat_spawn_output_and_logs(output, differences_in_log_file, $?)
-    else
-      output
-    end
-  ensure
-    begin
-      File.unlink(tempfile_path)
-    rescue
-      nil
-    end
-  end
-
-  def run_command_without_capturing_output(command)
-    options = {
-      in: "/dev/null",
-      out: :out,
-      err: :err,
-      close_others: true
-    }
-    if @keep_ios
-      @keep_ios.each do |io|
-        options[io] = io
-      end
-    end
-    pid = if @daemonize_for_me
-      Process.spawn(@env || {}, ruby_interpreter, SPAWNER_FILE,
-        command, options)
-    else
-      Process.spawn(@env || {}, command, options)
-    end
-
-    # run_command might be running in a timeout block (like
-    # in #start_without_locking).
-    begin
-      interruptable_waitpid(pid)
-    rescue Errno::ECHILD
-      # Maybe a background thread or whatever waitpid()'ed
-      # this child process before we had the chance. There's
-      # no way to obtain the exit status now. Assume that
-      # it started successfully; if it didn't we'll know
-      # that later by checking the PID file and by pinging
-      # it.
-      return
-    rescue Timeout::Error
-      daemonization_timed_out(pid)
-      raise InternalDaemonizationTimeout.new(pid: pid, output: nil)
-    end
-    if $?.exitstatus != 0
-      raise StartError, concat_spawn_output_and_logs(nil, differences_in_log_file, $?)
-    end
   end
 
   def run_ping_command
@@ -777,17 +758,14 @@ class DaemonController
     ) + rb_config["EXEEXT"]
   end
 
-  # Thread#kill (which is called by timeout.rb) may
-  # not be able to interrupt Process.waitpid. So here we use a
-  # special version that's a bit less efficient but is at least
-  # interruptable.
-  def interruptable_waitpid(pid)
-    result = nil
-    until result
-      result = Process.waitpid(pid, Process::WNOHANG)
-      sleep 0.01 if !result
+  def timeoutable(amount, &block)
+    Thread.handle_interrupt(Timeout::Error => :never) do
+      Timeout.timeout(@start_timeout, Timeout::Error, &block)
     end
-    result
+  end
+
+  def allow_timeout(&block)
+    Thread.handle_interrupt(Timeout::Error => :on_blocking, &block)
   end
 
   def signal_termination_message(process_status)
