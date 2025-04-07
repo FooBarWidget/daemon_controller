@@ -22,7 +22,7 @@
 # THE SOFTWARE.
 
 class DaemonController
-  MAJOR = 2
+  MAJOR = 3
   MINOR = 0
   TINY = 0
   VERSION_STRING = "#{MAJOR}.#{MINOR}.#{TINY}"
