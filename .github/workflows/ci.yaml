@@ -1,9 +1,13 @@
 name: CI
 
 on:
-  push: {}
-  pull_request_review:
-    types: [submitted, edited]
+  push:
+    branches:
+      - "*"
+  pull_request_target:
+    types:
+      - assigned
+      - synchronize
 
 jobs:
   test:
@@ -50,63 +54,3 @@ jobs:
 
       - name: Build gem
         run: gem build daemon_controller.gemspec
-
-      - name: Upload gem artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: gem
-          path: "daemon_controller-*.gem"
-
-  release:
-    runs-on: ubuntu-24.04
-    needs:
-      - test
-      - lint-and-build
-    if: startsWith(github.ref, 'refs/tags/')
-    environment: release
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.4"
-          bundler-cache: true
-
-      - name: Verify version number
-        id: get_version
-        run: |
-          VERSION_STRING=$(ruby -r ./lib/daemon_controller/version.rb -e "puts DaemonController::VERSION_STRING")
-          if ! [[ "$GITHUB_REF_NAME" =~ ^release- ]]; then
-            echo "Tag name must start with a 'release-'."
-            exit 1
-          fi
-          if [[ "$GITHUB_REF_NAME" != "release-${VERSION_STRING}" ]]; then
-            echo "Tag version ($GITHUB_REF_NAME) does not match version.rb ($VERSION_STRING)"
-            exit 1
-          fi
-
-      - name: Download gem artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: gem
-
-      - name: Create attestation
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: "daemon_controller-*.gem"
-
-      - name: Push gem to RubyGems
-        run: gem push daemon_controller-*.gem
-        env:
-          GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
-
-      - name: Create GitHub release
-        run: gh release create "$GITHUB_REF_NAME" *.gem --title "$GITHUB_REF_NAME" --notes-from-tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
