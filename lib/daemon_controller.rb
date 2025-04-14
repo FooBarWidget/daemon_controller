@@ -629,7 +629,7 @@ class DaemonController
     end
   ensure
     begin
-      File.unlink(tempfile_path) if tempfile_path
+      tempfile.unlink if tempfile
     rescue SystemCallError
       nil
     end
