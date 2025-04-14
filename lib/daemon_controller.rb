@@ -818,7 +818,7 @@ class DaemonController
   end
 
   def signal_name_for(num)
-    if (name = Signal.list.find { |name, n| n == num }[0])
+    if (name = Signal.list.key(num))
       "SIG#{name}"
     else
       num.to_s
