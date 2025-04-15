@@ -7,6 +7,7 @@ gemspec
 gem "rake"
 gem "rspec"
 gem "benchmark"
+gem "logger"
 
 group :lint do
   gem "standard"
