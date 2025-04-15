@@ -806,7 +806,9 @@ class DaemonController
   end
 
   def signal_termination_message(process_status)
-    if process_status.signaled?
+    if process_status.nil?
+      return
+    elsif process_status.signaled?
       "terminated with signal #{signal_name_for(process_status.termsig)}"
     else
       "exited with status #{process_status.exitstatus}"
@@ -826,30 +828,22 @@ class DaemonController
   end
 
   def concat_spawn_output_and_logs(output, logs, exit_status = nil, suffix_message = nil)
+    fmt = ->(prefix=nil) {[
+      prefix,
+      signal_termination_message(exit_status),
+      suffix_message
+    ].compact.join("; ")}
+
     if output.nil? && logs.nil?
-      result_inner = [
-        "logs not available",
-        exit_status ? signal_termination_message(exit_status) : nil,
-        suffix_message
-      ].compact.join("; ")
-      "(#{result_inner})"
-    elsif (output && output.empty? && logs && logs.empty?) || (output && output.empty? && logs.nil?) || (output.nil? && logs && logs.empty?)
-      result_inner = [
-        "logs empty",
-        exit_status ? signal_termination_message(exit_status) : nil,
-        suffix_message
-      ].compact.join("; ")
-      "(#{result_inner})"
+      "(#{fmt.call("logs not available")})"
+    elsif (output&.empty? && logs&.empty?) || (output&.empty? && logs.nil?) || (output.nil? && logs&.empty?)
+      "(#{fmt.call("logs empty")})"
+    elsif (result_inner = fmt.call).empty?
+      "#{output}\n#{logs}".strip
+    elsif logs&.empty?
+      "#{output}\n(#{result_inner})".strip
     else
-      result = ((output || "") + "\n" + (logs || "")).strip
-      result_suffix = [
-        exit_status ? signal_termination_message(exit_status) : nil,
-        suffix_message
-      ].compact.join("; ")
-      if !result_suffix.empty?
-        result << "\n(#{result_suffix})"
-      end
-      result
+      "#{output}\n#{logs}\n(#{result_inner})".strip
     end
   end
 
