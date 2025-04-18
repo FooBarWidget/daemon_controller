@@ -455,44 +455,10 @@ class DaemonController
 
   # Aborts a daemon that we tried to start, but timed out.
   def abort_start(pid:, is_direct_child:)
-    begin
-      debug "Killing process #{pid}"
-      Process.kill("SIGTERM", pid)
-    rescue SystemCallError
-    end
+    debug "Killing process #{pid}"
+    Process.kill("SIGTERM", pid)
 
-    begin
-      timeoutable(@start_abort_timeout) do
-        allow_timeout do
-          if is_direct_child
-            begin
-              debug "Waiting directly for process #{pid}"
-              Process.waitpid(pid)
-            rescue SystemCallError
-            end
-
-            # The daemon may have:
-            # 1. Written a PID file before forking. We delete this PID file.
-            #    -OR-
-            # 2. It might have forked (and written a PID file) right before
-            #    we terminated it. We'll want the fork to stay alive rather
-            #    than going through the (complicated) trouble of killing it.
-            #    Don't touch the PID file.
-            pid2 = read_pid_file
-            debug "PID file contains #{pid2.inspect}"
-            delete_pid_file if pid == pid2
-          else
-            debug "Waiting until daemon is no longer running"
-            wait_until { !daemon_is_running? }
-          end
-        end
-      end
-    rescue Timeout::Error
-      begin
-        Process.kill("SIGKILL", pid)
-      rescue SystemCallError
-      end
-
+    block = proc do
       allow_timeout do
         if is_direct_child
           begin
@@ -517,6 +483,12 @@ class DaemonController
         end
       end
     end
+
+    timeoutable(@start_abort_timeout, &block)
+  rescue Timeout::Error
+    Process.kill("SIGKILL", pid)
+    block.call
+  rescue SystemCallError
   end
 
   def save_log_file_information
