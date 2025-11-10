@@ -822,11 +822,11 @@ class DaemonController
 
     if output.nil? && logs.nil?
       "(#{fmt.call("logs not available")})"
-    elsif (output&.empty? && logs&.empty?) || (output&.empty? && logs.nil?) || (output.nil? && logs&.empty?)
+    elsif (output && output.empty? && logs && logs.empty?) || (output && output.empty? && logs.nil?) || (output.nil? && logs && logs.empty?)
       "(#{fmt.call("logs empty")})"
     elsif (result_inner = fmt.call).empty?
       "#{output}\n#{logs}".strip
-    elsif logs&.empty?
+    elsif logs && logs.empty?
       "#{output}\n(#{result_inner})".strip
     else
       "#{output}\n#{logs}\n(#{result_inner})".strip
