@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "shellwords"
+require "logger"
 
 root = File.absolute_path(File.join(File.dirname(__FILE__), ".."))
 Dir.chdir(root)
