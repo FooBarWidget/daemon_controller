@@ -791,7 +791,7 @@ class DaemonController
 
   def signal_termination_message(process_status)
     if process_status.nil?
-      return
+      nil
     elsif process_status.signaled?
       "terminated with signal #{signal_name_for(process_status.termsig)}"
     else
@@ -812,11 +812,13 @@ class DaemonController
   end
 
   def concat_spawn_output_and_logs(output, logs, exit_status = nil, suffix_message = nil)
-    fmt = ->(prefix=nil) {[
-      prefix,
-      signal_termination_message(exit_status),
-      suffix_message
-    ].compact.join("; ")}
+    fmt = lambda do |prefix = nil|
+      [
+        prefix,
+        signal_termination_message(exit_status),
+        suffix_message
+      ].compact.join("; ")
+    end
 
     if output.nil? && logs.nil?
       "(#{fmt.call("logs not available")})"
