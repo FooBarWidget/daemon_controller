@@ -812,9 +812,9 @@ class DaemonController
   end
 
   def concat_spawn_output_and_logs(output, logs, exit_status = nil, suffix_message = nil)
-    fmt = lambda do |prefix = nil|
+    fmt = lambda do |main_message = nil|
       [
-        prefix,
+        main_message,
         signal_termination_message(exit_status),
         suffix_message
       ].compact.join("; ")
