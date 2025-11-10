@@ -810,7 +810,7 @@ class DaemonController
   end
 
   def concat_spawn_output_and_logs(output, logs, exit_status = nil, suffix_message = nil)
-    fmt = lambda do |main_message = nil|
+    format_full_suffix_message = lambda do |main_message = nil|
       [
         main_message,
         exit_status ? signal_termination_message(exit_status) : nil,
@@ -819,15 +819,18 @@ class DaemonController
     end
 
     if output.nil? && logs.nil?
-      "(#{fmt.call("logs not available")})"
+      "(#{format_full_suffix_message.call("logs not available")})"
     elsif (output && output.empty? && logs && logs.empty?) || (output && output.empty? && logs.nil?) || (output.nil? && logs && logs.empty?)
-      "(#{fmt.call("logs empty")})"
-    elsif (result_inner = fmt.call).empty?
-      "#{output}\n#{logs}".strip
-    elsif logs && logs.empty?
-      "#{output}\n(#{result_inner})".strip
+      "(#{format_full_suffix_message.call("logs empty")})"
     else
-      "#{output}\n#{logs}\n(#{result_inner})".strip
+      full_suffix_message = format_full_suffix_message.call
+      if full_suffix_message.empty?
+        "#{output}\n#{logs}".strip
+      elsif logs && logs.empty?
+        "#{output}\n(#{full_suffix_message})".strip
+      else
+        "#{output}\n#{logs}\n(#{full_suffix_message})".strip
+      end
     end
   end
 
