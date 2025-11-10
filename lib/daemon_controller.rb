@@ -810,30 +810,27 @@ class DaemonController
   end
 
   def concat_spawn_output_and_logs(output, logs, exit_status = nil, suffix_message = nil)
+    format_full_suffix_message = lambda do |main_message = nil|
+      [
+        main_message,
+        exit_status ? signal_termination_message(exit_status) : nil,
+        suffix_message
+      ].compact.join("; ")
+    end
+
     if output.nil? && logs.nil?
-      result_inner = [
-        "logs not available",
-        exit_status ? signal_termination_message(exit_status) : nil,
-        suffix_message
-      ].compact.join("; ")
-      "(#{result_inner})"
+      "(#{format_full_suffix_message.call("logs not available")})"
     elsif (output && output.empty? && logs && logs.empty?) || (output && output.empty? && logs.nil?) || (output.nil? && logs && logs.empty?)
-      result_inner = [
-        "logs empty",
-        exit_status ? signal_termination_message(exit_status) : nil,
-        suffix_message
-      ].compact.join("; ")
-      "(#{result_inner})"
+      "(#{format_full_suffix_message.call("logs empty")})"
     else
-      result = ((output || "") + "\n" + (logs || "")).strip
-      result_suffix = [
-        exit_status ? signal_termination_message(exit_status) : nil,
-        suffix_message
-      ].compact.join("; ")
-      if !result_suffix.empty?
-        result << "\n(#{result_suffix})"
+      full_suffix_message = format_full_suffix_message.call
+      if full_suffix_message.empty?
+        "#{output}\n#{logs}".strip
+      elsif logs && logs.empty?
+        "#{output}\n(#{full_suffix_message})".strip
+      else
+        "#{output}\n#{logs}\n(#{full_suffix_message})".strip
       end
-      result
     end
   end
 
