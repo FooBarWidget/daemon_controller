@@ -455,8 +455,11 @@ class DaemonController
 
   # Aborts a daemon that we tried to start, but timed out.
   def abort_start(pid:, is_direct_child:)
-    debug "Killing process #{pid}"
-    Process.kill("SIGTERM", pid)
+    begin
+      debug "Killing process #{pid}"
+      Process.kill("SIGTERM", pid)
+    rescue SystemCallError
+    end
 
     block = proc do
       allow_timeout do
