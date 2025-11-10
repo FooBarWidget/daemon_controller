@@ -790,9 +790,7 @@ class DaemonController
   end
 
   def signal_termination_message(process_status)
-    if process_status.nil?
-      nil
-    elsif process_status.signaled?
+    if process_status.signaled?
       "terminated with signal #{signal_name_for(process_status.termsig)}"
     else
       "exited with status #{process_status.exitstatus}"
@@ -815,7 +813,7 @@ class DaemonController
     fmt = lambda do |main_message = nil|
       [
         main_message,
-        signal_termination_message(exit_status),
+        exit_status ? signal_termination_message(exit_status) : nil,
         suffix_message
       ].compact.join("; ")
     end
