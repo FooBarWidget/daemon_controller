@@ -747,10 +747,9 @@ class DaemonController
   end
 
   def ruby_interpreter
-    rb_config = defined?(RbConfig) ? RbConfig::CONFIG : Config::CONFIG
     File.join(
-      rb_config["bindir"],
-      rb_config.values_at("RUBY_INSTALL_NAME", "EXEEXT").join
+      RbConfig::CONFIG["bindir"],
+      RbConfig::CONFIG.values_at("RUBY_INSTALL_NAME", "EXEEXT").join
     )
   end
 
