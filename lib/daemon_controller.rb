@@ -74,7 +74,7 @@ class DaemonController
     lock_file: nil, stop_command: nil, restart_command: nil, before_start: nil,
     start_timeout: 30, start_abort_timeout: 10, stop_timeout: 30,
     log_file_activity_timeout: 10, ping_interval: 0.1, stop_graceful_signal: "TERM", dont_stop_if_pid_file_invalid: false,
-    daemonize_for_me: false, keep_ios: nil, env: nil, logger: nil)
+    daemonize_for_me: false, keep_ios: nil, env: {}, logger: nil)
     @identifier = identifier
     @start_command = start_command
     @ping_command = ping_command
@@ -140,7 +140,7 @@ class DaemonController
     end
     if connection.nil?
       @lock_file.exclusive_lock do
-        if !daemon_is_running?
+        unless daemon_is_running?
           start_without_locking
         end
         connect_exception = nil
@@ -335,9 +335,7 @@ class DaemonController
 
   def kill_daemon
     if @stop_command
-      if @dont_stop_if_pid_file_invalid && read_pid_file.nil?
-        return
-      end
+      return if @dont_stop_if_pid_file_invalid && read_pid_file.nil?
 
       result = run_command(@stop_command)
       case result
@@ -356,8 +354,7 @@ class DaemonController
   end
 
   def kill_daemon_with_signal(force: false)
-    pid = read_pid_file
-    if pid
+    if (pid = read_pid_file)
       if force
         Process.kill("SIGKILL", pid)
       else
@@ -380,14 +377,11 @@ class DaemonController
   end
 
   def read_pid_file
-    begin
-      pid = File.read(@pid_file).strip
-    rescue Errno::ENOENT
-      return nil
-    end
+    pid = File.read(@pid_file).strip
     if /\A\d+\Z/.match?(pid)
       pid.to_i
     end
+  rescue Errno::ENOENT
   end
 
   def delete_pid_file
@@ -438,7 +432,7 @@ class DaemonController
   end
 
   def pid_file_available?
-    File.exist?(@pid_file) && File.stat(@pid_file).size != 0
+    File.exist?(@pid_file) && !File.zero?(@pid_file)
   end
 
   # This method does nothing and only serves as a hook for the unit test.
@@ -582,10 +576,10 @@ class DaemonController
     end
 
     pid = if @daemonize_for_me
-      Process.spawn(@env || {}, ruby_interpreter, SPAWNER_FILE,
+      Process.spawn(@env, ruby_interpreter, SPAWNER_FILE,
         command, spawn_options)
     else
-      Process.spawn(@env || {}, command, spawn_options)
+      Process.spawn(@env, command, spawn_options)
     end
 
     # run_command might be running in a timeout block (like
@@ -599,9 +593,9 @@ class DaemonController
       # it started successfully; if it didn't we'll know
       # that later by checking the PID file and by pinging
       # it.
-      return InternalCommandOkResult.new(pid, tempfile_path ? File.read(tempfile_path).strip : nil)
+      return InternalCommandOkResult.new(pid, tempfile_path && File.read(tempfile_path).strip)
     rescue Timeout::Error
-      return InternalCommandTimeoutResult.new(pid, tempfile_path ? File.read(tempfile_path).strip : nil)
+      return InternalCommandTimeoutResult.new(pid, tempfile_path && File.read(tempfile_path).strip)
     end
 
     child_status = $?
@@ -690,43 +684,7 @@ class DaemonController
     end
   end
 
-  if !can_ping_unix_sockets?
-    require "java"
-
-    def ping_socket(host_name, port)
-      channel = java.nio.channels.SocketChannel.open
-      begin
-        address = java.net.InetSocketAddress.new(host_name, port)
-        channel.configure_blocking(false)
-        if channel.connect(address)
-          return true
-        end
-
-        deadline = Time.now.to_f + 0.1
-        while true
-          begin
-            if channel.finish_connect
-              return true
-            end
-          rescue java.net.ConnectException => e
-            if /Connection refused/i.match?(e.message)
-              return false
-            else
-              throw e
-            end
-          end
-
-          # Not done connecting and no error.
-          sleep 0.01
-          if Time.now.to_f >= deadline
-            return false
-          end
-        end
-      ensure
-        channel.close
-      end
-    end
-  else
+  if can_ping_unix_sockets?
     def ping_socket(socket_domain, sockaddr)
       socket = Socket.new(socket_domain, Socket::Constants::SOCK_STREAM, 0)
       begin
@@ -759,18 +717,43 @@ class DaemonController
     rescue Errno::EAFNOSUPPORT
       ping_socket(Socket::Constants::AF_INET6, sockaddr)
     end
+  else
+    require "java"
+
+    def ping_socket(host_name, port)
+      channel = java.nio.channels.SocketChannel.open
+      begin
+        address = java.net.InetSocketAddress.new(host_name, port)
+        channel.configure_blocking(false)
+        return true if channel.connect(address)
+
+        deadline = Time.now.to_f + 0.1
+        loop do
+          begin
+            return true if channel.finish_connect
+          rescue java.net.ConnectException => e
+            if /Connection refused/i.match?(e.message)
+              return false
+            else
+              throw e
+            end
+          end
+
+          # Not done connecting and no error.
+          sleep 0.01
+          return false if Time.now.to_f >= deadline
+        end
+      ensure
+        channel.close
+      end
+    end
   end
 
   def ruby_interpreter
-    rb_config = if defined?(RbConfig)
-      RbConfig::CONFIG
-    else
-      Config::CONFIG
-    end
     File.join(
-      rb_config["bindir"],
-      rb_config["RUBY_INSTALL_NAME"]
-    ) + rb_config["EXEEXT"]
+      RbConfig::CONFIG["bindir"],
+      RbConfig::CONFIG.values_at("RUBY_INSTALL_NAME", "EXEEXT").join
+    )
   end
 
   def timeoutable(amount, &block)
