@@ -757,7 +757,7 @@ class DaemonController
     Thread.handle_interrupt(Timeout::Error => :never) do
       start_time = monotonic_time
       result = Timeout.timeout(amount, Timeout::Error, &block)
-      [result, (monotonic_time - start_time).clamp(0..)]
+      [result, [monotonic_time - start_time, 0].max]
     end
   end
 
