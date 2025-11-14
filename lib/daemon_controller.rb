@@ -549,7 +549,10 @@ class DaemonController
   def run_command(command)
     if should_capture_output_while_running_command?
       # Create tempfile for storing the command's output.
-      tempfile_path = Tempfile.create("daemon-output").tap(&:close).path
+      tempfile = Tempfile.new("daemon-output")
+      tempfile.chmod(0o666)
+      tempfile_path = tempfile.path
+      tempfile.close
 
       spawn_options = {
         in: "/dev/null",
