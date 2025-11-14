@@ -432,7 +432,7 @@ class DaemonController
   end
 
   def pid_file_available?
-    File.exist?(@pid_file) && !File.empty?(@pid_file)
+    File.exist?(@pid_file) && !File.zero?(@pid_file)
   end
 
   # This method does nothing and only serves as a hook for the unit test.
@@ -747,10 +747,10 @@ class DaemonController
   end
 
   def ruby_interpreter
-    rb_config = defined?(RbConfig)? RbConfig::CONFIG : Config::CONFIG
+    rb_config = defined?(RbConfig) ? RbConfig::CONFIG : Config::CONFIG
     File.join(
       rb_config["bindir"],
-      rb_config.values_at("RUBY_INSTALL_NAME","EXEEXT").join
+      rb_config.values_at("RUBY_INSTALL_NAME", "EXEEXT").join
     )
   end
 
