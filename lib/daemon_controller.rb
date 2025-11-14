@@ -684,37 +684,7 @@ class DaemonController
     end
   end
 
-  unless can_ping_unix_sockets?
-    require "java"
-
-    def ping_socket(host_name, port)
-      channel = java.nio.channels.SocketChannel.open
-      begin
-        address = java.net.InetSocketAddress.new(host_name, port)
-        channel.configure_blocking(false)
-        return true if channel.connect(address)
-
-        deadline = Time.now.to_f + 0.1
-        loop do
-          begin
-            return true if channel.finish_connect
-          rescue java.net.ConnectException => e
-            if /Connection refused/i.match?(e.message)
-              return false
-            else
-              throw e
-            end
-          end
-
-          # Not done connecting and no error.
-          sleep 0.01
-          return false if Time.now.to_f >= deadline
-        end
-      ensure
-        channel.close
-      end
-    end
-  else
+  if can_ping_unix_sockets?
     def ping_socket(socket_domain, sockaddr)
       socket = Socket.new(socket_domain, Socket::Constants::SOCK_STREAM, 0)
       begin
@@ -746,6 +716,36 @@ class DaemonController
       ping_socket(Socket::Constants::AF_INET, sockaddr)
     rescue Errno::EAFNOSUPPORT
       ping_socket(Socket::Constants::AF_INET6, sockaddr)
+    end
+  else
+    require "java"
+
+    def ping_socket(host_name, port)
+      channel = java.nio.channels.SocketChannel.open
+      begin
+        address = java.net.InetSocketAddress.new(host_name, port)
+        channel.configure_blocking(false)
+        return true if channel.connect(address)
+
+        deadline = Time.now.to_f + 0.1
+        loop do
+          begin
+            return true if channel.finish_connect
+          rescue java.net.ConnectException => e
+            if /Connection refused/i.match?(e.message)
+              return false
+            else
+              throw e
+            end
+          end
+
+          # Not done connecting and no error.
+          sleep 0.01
+          return false if Time.now.to_f >= deadline
+        end
+      ensure
+        channel.close
+      end
     end
   end
 
