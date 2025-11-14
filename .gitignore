@@ -1,6 +1,7 @@
 .DS_Store
 .vscode
 *.gem
+/pkg
 spec/echo_server.log
 spec/echo_server.pid
 spec/echo_server.pid.lock

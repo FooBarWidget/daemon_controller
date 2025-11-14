@@ -24,7 +24,9 @@ jobs:
     steps:
       - name: Checkout code
         if: github.event_name == 'push'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
@@ -50,7 +52,9 @@ jobs:
     steps:
       - name: Checkout code
         if: github.event_name == 'push'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
@@ -69,4 +73,4 @@ jobs:
         run: bundle exec standardrb
 
       - name: Build gem
-        run: gem build daemon_controller.gemspec
+        run: bundle exec rake gem

@@ -16,7 +16,9 @@ jobs:
       attestations: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -37,20 +39,14 @@ jobs:
             exit 1
           fi
 
-      - name: Build gem
-        run: gem build daemon_controller.gemspec
+      - uses: rubygems/release-gem@v1
 
       - name: Create attestation
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: "daemon_controller-*.gem"
-
-      - name: Push gem to RubyGems
-        run: gem push daemon_controller-*.gem
-        env:
-          GEM_HOST_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+          subject-path: "pkg/daemon_controller-*.gem"
 
       - name: Create GitHub release
-        run: gh release create "$GITHUB_REF_NAME" *.gem --title "$GITHUB_REF_NAME" --notes-from-tag
+        run: gh release create "$GITHUB_REF_NAME" pkg/*.gem --title "$GITHUB_REF_NAME" --notes-from-tag
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

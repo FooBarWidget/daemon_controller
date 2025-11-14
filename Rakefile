@@ -8,15 +8,13 @@ task :test do
   ruby "-S rspec spec/*_spec.rb"
 end
 
-desc "Build & upload gem"
-task "package:release" do
-  sh "git tag -s release-#{PACKAGE_VERSION}"
-  sh "gem build #{PACKAGE_NAME}.gemspec"
-  puts "Proceed with pushing tag to Github and uploading the gem? [y/n]"
-  if $stdin.readline == "y\n"
-    sh "git push origin release-#{PACKAGE_VERSION}"
-    sh "gem push #{PACKAGE_NAME}-#{PACKAGE_VERSION}.gem"
-  else
-    puts "Did not upload the gem."
-  end
+desc "Build gem"
+task :gem do
+  mkdir_p "pkg"
+  sh "gem build daemon_controller.gemspec -o pkg/#{PACKAGE_NAME}-#{PACKAGE_VERSION}.gem"
+end
+
+desc "Build release artifacts"
+task release: :gem do
+  sh "gem push pkg/#{PACKAGE_NAME}-#{PACKAGE_VERSION}.gem"
 end
