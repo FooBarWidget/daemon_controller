@@ -1,13 +1,22 @@
-name: CI
+name: Test
 
 on:
   push:
     branches:
-      - "*"
-  pull_request_target:
+      - "**"
+  pull_request:
     types:
-      - assigned
+      - opened
+      - reopened
       - synchronize
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name
+    == 'pull_request_target' }}
 
 jobs:
   test:
@@ -23,17 +32,9 @@ jobs:
       BUNDLE_WITHOUT: lint
     steps:
       - name: Checkout code
-        if: github.event_name == 'push'
-        uses: actions/checkout@v5
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-
-      - name: Checkout PR code
-        if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -51,17 +52,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        if: github.event_name == 'push'
-        uses: actions/checkout@v5
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-
-      - name: Checkout PR code
-        if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
