@@ -706,7 +706,10 @@ class DaemonController
         end
       end
       true
-    rescue Errno::ECONNREFUSED, Errno::ENOENT
+    rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ENOENT
+      # ECONNRESET: the connection landed in the listen backlog of a
+      # server that closed its listening socket before accepting it,
+      # e.g. because it is shutting down.
       false
     ensure
       socket.close if socket
