@@ -705,7 +705,7 @@ class DaemonController
           raise Errno::ECONNREFUSED
         end
       end
-      true
+      socket_connected?(socket)
     rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ENOENT
       # ECONNRESET: the connection landed in the listen backlog of a
       # server that closed its listening socket before accepting it,
@@ -713,6 +713,17 @@ class DaemonController
       false
     ensure
       socket.close if socket
+    end
+
+    # Some macOS systems (seen on warp CI runners in 2026) report a nonblocking
+    # connect to a closed TCP port as successful, so ping_socket confirms the
+    # connection by asking for the peer address. macOS fails that call with
+    # EINVAL instead of ENOTCONN when the connection attempt has failed.
+    def socket_connected?(socket)
+      socket.getpeername
+      true
+    rescue Errno::ENOTCONN, Errno::EINVAL
+      false
     end
 
     def ping_tcp_socket(sockaddr)
